@@ -212,13 +212,13 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
 
   return <div className="dungeon-runs-panel">
     <div className="action-row dungeon-runs-filters">
-      <SegmentedControl name="dungeon-runs-view" ariaLabel="Dungeon runs view" value={view} options={DUNGEON_VIEWS} onChange={setView} />
+      <SegmentedControl name="dungeon-runs-view" ariaLabel="Dungeon Runs View" value={view} options={DUNGEON_VIEWS} onChange={setView} />
       <select aria-label="Dungeon" value={dungeonId} onChange={(event) => changeDungeon(event.target.value)}>
-        <option value="">All dungeons</option>
+        <option value="">All Dungeons</option>
         {dungeonOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>
       <select aria-label="Difficulty" value={difficulty === null ? "" : String(difficulty)} onChange={(event) => changeDifficulty(event.target.value)}>
-        <option value="">All difficulties</option>
+        <option value="">All Difficulties</option>
         {difficultyOptions.map((value) => <option key={value} value={value}>{value}</option>)}
       </select>
       <button onClick={() => setRefreshKey((key) => key + 1)}>Refresh</button>
@@ -231,8 +231,8 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
           setQ(event.target.value);
         }}
         onKeyDown={(event) => { if (event.key === "Enter") void submitPlayer(); }}
-        placeholder="Filter by character name or actor ID"
-        aria-label="Filter by character name or actor ID"
+        placeholder="Filter by Character Name or Actor ID"
+        aria-label="Filter by Character Name or Actor ID"
       />
       <button onClick={() => void submitPlayer()}>Search</button>
       <button onClick={clearPlayer} disabled={!q && !player}>Clear</button>
@@ -260,8 +260,8 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
       <p className="action-help-note">{loading
         ? "Loading dungeon runs…"
         : filtered
-        ? `${totalCount.toLocaleString()} of ${count.toLocaleString()} runs · newest first`
-        : `${count.toLocaleString()} runs · newest first`}</p>
+        ? `${totalCount.toLocaleString()} of ${count.toLocaleString()} runs · Newest First`
+        : `${count.toLocaleString()} runs · Newest First`}</p>
       <DataTable
         rows={runRows}
         columns={["dungeon", "difficulty", "duration", "party"]}

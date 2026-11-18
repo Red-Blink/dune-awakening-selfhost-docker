@@ -296,7 +296,7 @@ export function PlayerSummary({
           type="button"
           className="summary-dungeons-show-all"
           onClick={() => setShowAllBestTimes(!showAllBestTimes)}
-        >{showAllBestTimes ? "Show fewer items" : `Show all ${bestDungeonTimes.length.toLocaleString()} items`}</button>}
+        >{showAllBestTimes ? "Show Fewer Items" : `Show All ${bestDungeonTimes.length.toLocaleString()} Items`}</button>}
         <DataTable
           rows={visibleDungeonRows}
           columns={["dungeon", "difficulty", "duration", "party"]}
@@ -317,7 +317,7 @@ export function PlayerSummary({
           type="button"
           className="summary-dungeons-show-all"
           onClick={() => setShowAllDungeonRuns(!showAllDungeonRuns)}
-        >{showAllDungeonRuns ? "Show fewer items" : `Show all ${dungeonRows.length.toLocaleString()} items`}</button>}
+        >{showAllDungeonRuns ? "Show Fewer Items" : `Show All ${dungeonRows.length.toLocaleString()} Items`}</button>}
       </>}
     </div>}
 

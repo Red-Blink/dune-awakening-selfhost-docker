@@ -610,12 +610,12 @@ describe("PlayerSummary", () => {
       expect(bestRows()).toHaveLength(5);
       expect([...bestRows()].map((row) => row.lastElementChild?.textContent)).toEqual(["1:00", "2:00", "3:00", "4:00", "5:00"]);
       expect(runRows()).toHaveLength(10);
-      const [bestToggle, runsToggle] = screen.getAllByRole("button", { name: "Show all 12 items" });
+      const [bestToggle, runsToggle] = screen.getAllByRole("button", { name: "Show All 12 Items" });
       fireEvent.click(bestToggle);
       expect(bestRows()).toHaveLength(12);
       fireEvent.click(runsToggle);
       expect(runRows()).toHaveLength(12);
-      fireEvent.click(screen.getAllByRole("button", { name: "Show fewer items" })[1]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Show Fewer Items" })[1]);
       expect(runRows()).toHaveLength(10);
     });
 

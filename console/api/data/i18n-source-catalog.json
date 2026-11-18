@@ -172,6 +172,8 @@
     "All Categories",
     "All Categories ({count0})",
     "All Channels",
+    "All Difficulties",
+    "All Dungeons",
     "All Groups",
     "All Languages",
     "All Listings",
@@ -185,8 +187,6 @@
     "All Runs",
     "All Sets",
     "All Types",
-    "All difficulties",
-    "All dungeons",
     "All levels",
     "All routines",
     "All selected cosmetics are already pending or unlocked. No duplicates were added.",
@@ -1002,9 +1002,9 @@
     "Dune.GlobalVehicleMiningOutputMultiplier",
     "Dungeon",
     "Dungeon Runs",
+    "Dungeon Runs View",
     "Dungeon runs aren't available on this database version.",
     "Dungeon runs couldn't be loaded.",
-    "Dungeon runs view",
     "Durability",
     "Durability not reported",
     "Duration",
@@ -1181,7 +1181,7 @@
     "Filter Research Schematics",
     "Filter Spice Field Settings",
     "Filter base inventory",
-    "Filter by character name or actor ID",
+    "Filter by Character Name or Actor ID",
     "Filter by container group",
     "Filter by map, size, or dimension",
     "Filter by name, ID, status, or dependency",
@@ -3536,10 +3536,10 @@
     "{count0} dungeon and difficulty pairs · {count1} runs",
     "{count0} fields",
     "{count0} of {count1}",
-    "{count0} of {count1} runs · newest first",
+    "{count0} of {count1} runs · Newest First",
     "{count0} palettes",
     "{count0} rows",
-    "{count0} runs · newest first",
+    "{count0} runs · Newest First",
     "{count0} warnings",
     "{count0}d {count1}h",
     "{count0}h ago",
@@ -4431,14 +4431,14 @@
         ]
       }
     ],
-    "{count0} of {count1} runs · newest first": [
+    "{count0} of {count1} runs · Newest First": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 263,
         "nearby": [
           "No dungeon runs recorded.",
           "Loading dungeon runs…",
-          "{count0} runs · newest first"
+          "{count0} runs · Newest First"
         ]
       }
     ],
@@ -4465,13 +4465,13 @@
         ]
       }
     ],
-    "{count0} runs · newest first": [
+    "{count0} runs · Newest First": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 264,
         "nearby": [
           "Loading dungeon runs…",
-          "{count0} of {count1} runs · newest first",
+          "{count0} of {count1} runs · Newest First",
           "No runs match these filters."
         ]
       }
@@ -6691,27 +6691,27 @@
         ]
       }
     ],
-    "All difficulties": [
+    "All Difficulties": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 221,
         "nearby": [
-          "All dungeons",
+          "All Dungeons",
           "Difficulty",
           "Refresh",
-          "Filter by character name or actor ID"
+          "Filter by Character Name or Actor ID"
         ]
       }
     ],
-    "All dungeons": [
+    "All Dungeons": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 217,
         "nearby": [
-          "Dungeon runs view",
+          "Dungeon Runs View",
           "Dungeon",
           "Difficulty",
-          "All difficulties"
+          "All Difficulties"
         ]
       }
     ],
@@ -9784,7 +9784,7 @@
           "Total",
           "Showing the latest {count0} runs.",
           "Difficulty",
-          "Show fewer items"
+          "Show Fewer Items"
         ]
       }
     ],
@@ -17644,8 +17644,8 @@
         "line": 220,
         "nearby": [
           "Dungeon",
-          "All dungeons",
-          "All difficulties",
+          "All Dungeons",
+          "All Difficulties",
           "Refresh"
         ]
       },
@@ -17655,8 +17655,8 @@
         "nearby": [
           "Showing the latest {count0} runs.",
           "Best Times",
-          "Show fewer items",
-          "Show all {count0} items"
+          "Show Fewer Items",
+          "Show All {count0} Items"
         ]
       }
     ],
@@ -19033,8 +19033,8 @@
         "line": 216,
         "nearby": [
           "Refresh",
-          "Dungeon runs view",
-          "All dungeons",
+          "Dungeon Runs View",
+          "All Dungeons",
           "Difficulty"
         ]
       }
@@ -19081,7 +19081,7 @@
           "More than one player matches. Enter the full character name or actor ID.",
           "Dungeon runs aren't available on this database version.",
           "Refresh",
-          "Dungeon runs view"
+          "Dungeon Runs View"
         ]
       },
       {
@@ -19095,7 +19095,7 @@
         ]
       }
     ],
-    "Dungeon runs view": [
+    "Dungeon Runs View": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 215,
@@ -19103,7 +19103,7 @@
           "Dungeon runs couldn't be loaded.",
           "Refresh",
           "Dungeon",
-          "All dungeons"
+          "All Dungeons"
         ]
       }
     ],
@@ -21407,12 +21407,12 @@
         ]
       }
     ],
-    "Filter by character name or actor ID": [
+    "Filter by Character Name or Actor ID": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 234,
         "nearby": [
-          "All difficulties",
+          "All Difficulties",
           "Refresh",
           "Search"
         ]
@@ -27890,16 +27890,16 @@
         "nearby": [
           "No runs match these filters.",
           "No dungeon runs recorded.",
-          "{count0} of {count1} runs · newest first",
-          "{count0} runs · newest first"
+          "{count0} of {count1} runs · Newest First",
+          "{count0} runs · Newest First"
         ]
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 271,
         "nearby": [
-          "{count0} of {count1} runs · newest first",
-          "{count0} runs · newest first",
+          "{count0} of {count1} runs · Newest First",
+          "{count0} runs · Newest First",
           "No runs match these filters.",
           "No dungeon runs recorded."
         ]
@@ -31451,7 +31451,7 @@
         "nearby": [
           "Loading dungeon runs…",
           "No runs match these filters.",
-          "{count0} of {count1} runs · newest first"
+          "{count0} of {count1} runs · Newest First"
         ]
       },
       {
@@ -32205,7 +32205,7 @@
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
         "line": 271,
         "nearby": [
-          "{count0} runs · newest first",
+          "{count0} runs · Newest First",
           "Loading dungeon runs…",
           "No dungeon runs recorded.",
           "Showing"
@@ -46509,20 +46509,22 @@
           "No containers match this filter.",
           "No storage at this base."
         ]
-      },
+      }
+    ],
+    "Show All {count0} Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 299,
         "nearby": [
           "Difficulty",
-          "Show fewer items"
+          "Show Fewer Items"
         ]
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 320,
         "nearby": [
-          "Show fewer items"
+          "Show Fewer Items"
         ]
       }
     ],
@@ -46580,21 +46582,23 @@
           "Show all {count0} items",
           "No containers match this filter."
         ]
-      },
+      }
+    ],
+    "Show Fewer Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 299,
         "nearby": [
           "Best Times",
           "Difficulty",
-          "Show all {count0} items"
+          "Show All {count0} Items"
         ]
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 320,
         "nearby": [
-          "Show all {count0} items"
+          "Show All {count0} Items"
         ]
       }
     ],

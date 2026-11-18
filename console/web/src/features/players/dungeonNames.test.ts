@@ -8,7 +8,8 @@ describe("dungeonDisplayName", () => {
   });
 
   it("falls back to the asset suffix for a number with no known map", () => {
-    expect(dungeonDisplayName("DA_Dgn_999_Sand_Storm")).toBe("Sand Storm");
+    expect(dungeonDisplayName("DA_Dgn_999_sand_storm")).toBe("Sand Storm");
+    expect(dungeonDisplayName("DA_Dgn_999_SandStorm")).toBe("Sand Storm");
   });
 
   it("resolves named dungeon assets through CB_Dungeon map names", () => {

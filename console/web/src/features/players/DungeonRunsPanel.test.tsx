@@ -41,10 +41,10 @@ describe("DungeonRunsPanel", () => {
     const firstCells = [...document.querySelectorAll('.dungeon-runs-table td[data-column="dungeon"]')].map((cell) => cell.textContent);
     expect(firstCells).toEqual(["Darkness", "Fire Lab", "Fire Lab"]);
     const dungeonSelect = screen.getByRole("combobox", { name: "Dungeon" });
-    expect(within(dungeonSelect).getAllByRole("option").map((option) => option.textContent)).toEqual(["All dungeons", "Darkness", "Fire Lab"]);
+    expect(within(dungeonSelect).getAllByRole("option").map((option) => option.textContent)).toEqual(["All Dungeons", "Darkness", "Fire Lab"]);
     fireEvent.change(dungeonSelect, { target: { value: "DA_Dgn_136_Fire" } });
     expect(screen.getByText("2 dungeon and difficulty pairs · 6 runs")).toBeInTheDocument();
-    expect(within(screen.getByRole("combobox", { name: "Difficulty" })).getAllByRole("option").map((option) => option.textContent)).toEqual(["All difficulties", "2", "3"]);
+    expect(within(screen.getByRole("combobox", { name: "Difficulty" })).getAllByRole("option").map((option) => option.textContent)).toEqual(["All Difficulties", "2", "3"]);
   });
 
   it("opens a party member's details and leaves deleted members as plain text", async () => {
@@ -66,7 +66,7 @@ describe("DungeonRunsPanel", () => {
     fireEvent.click(screen.getByRole("radio", { name: "All Runs" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Dungeon" }), { target: { value: "DA_Dgn_136_Fire" } });
     await waitFor(() => expect(dungeonsApi.runs).toHaveBeenLastCalledWith({ dungeonId: "DA_Dgn_136_Fire", difficulty: null, playerId: undefined, page: 0, pageSize: 50 }));
-    expect(await screen.findByText("120 of 300 runs · newest first")).toBeInTheDocument();
+    expect(await screen.findByText("120 of 300 runs · Newest First")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(dungeonsApi.runs).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
   });
@@ -76,7 +76,7 @@ describe("DungeonRunsPanel", () => {
     vi.mocked(playersApi.list).mockResolvedValueOnce({ rows: [{ actor_id: 25, character_name: "Aster" }, { actor_id: 77, character_name: "Asterion" }], totalCount: 2, totalPlayers: 2, capabilities: {} });
     renderPanel();
     await waitFor(() => expect(dungeonsApi.leaderboard).toHaveBeenCalled());
-    const input = screen.getByPlaceholderText("Filter by character name or actor ID");
+    const input = screen.getByPlaceholderText("Filter by Character Name or Actor ID");
     fireEvent.change(input, { target: { value: "aster" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await waitFor(() => expect(dungeonsApi.leaderboard).toHaveBeenCalledWith({ playerId: "25" }));
@@ -98,7 +98,7 @@ describe("DungeonRunsPanel", () => {
       return { capabilities: { dungeons: true }, entries };
     });
     renderPanel();
-    const input = await screen.findByLabelText("Filter by character name or actor ID");
+    const input = await screen.findByLabelText("Filter by Character Name or Actor ID");
     fireEvent.change(input, { target: { value: "Aster" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText("1 dungeon and difficulty pairs · 4 runs");
@@ -124,7 +124,7 @@ describe("DungeonRunsPanel", () => {
     renderPanel();
     await screen.findByText("3 dungeon and difficulty pairs · 7 runs");
     vi.mocked(dungeonsApi.leaderboard).mockRejectedValueOnce(new Error("request failed"));
-    fireEvent.change(screen.getByLabelText("Filter by character name or actor ID"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Filter by Character Name or Actor ID"), { target: { value: "25" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(await screen.findByText("Dungeon runs couldn't be loaded.")).toBeInTheDocument();
     expect(screen.queryByText("Loading dungeon runs…")).not.toBeInTheDocument();
@@ -138,7 +138,7 @@ describe("DungeonRunsPanel", () => {
     vi.mocked(playersApi.list).mockImplementationOnce(() => new Promise((resolve) => { completeLookup = resolve; }));
     renderPanel();
     await screen.findByText("3 dungeon and difficulty pairs · 7 runs");
-    fireEvent.change(screen.getByLabelText("Filter by character name or actor ID"), { target: { value: "Aster" } });
+    fireEvent.change(screen.getByLabelText("Filter by Character Name or Actor ID"), { target: { value: "Aster" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     await act(async () => completeLookup({ rows: [{ actor_id: 25, character_name: "Aster" }], totalCount: 1, totalPlayers: 1, capabilities: {} }));
@@ -151,7 +151,7 @@ describe("DungeonRunsPanel", () => {
       .mockResolvedValueOnce({ rows: [{ actor_id: 25, character_name: "Aster" }], totalCount: 1, totalPlayers: 1, capabilities: {} })
       .mockResolvedValueOnce({ rows: [], totalCount: 0, totalPlayers: 0, capabilities: {} });
     renderPanel();
-    const input = await screen.findByLabelText("Filter by character name or actor ID");
+    const input = await screen.findByLabelText("Filter by Character Name or Actor ID");
     fireEvent.change(input, { target: { value: "Aster" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText("Showing runs for");
