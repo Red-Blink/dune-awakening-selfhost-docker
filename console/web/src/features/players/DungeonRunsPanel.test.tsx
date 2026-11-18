@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DungeonRunsPanel } from "./DungeonRunsPanel";
 import { dungeonsApi } from "../../api/dungeons";
 import { playersApi } from "../../api/players";
@@ -118,6 +118,32 @@ describe("DungeonRunsPanel", () => {
     expect(onError).toHaveBeenCalledWith("boom");
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(await screen.findByText("3 dungeon and difficulty pairs · 7 runs")).toBeInTheDocument();
+  });
+
+  it("exits loading and lets the user retry a failed player leaderboard", async () => {
+    renderPanel();
+    await screen.findByText("3 dungeon and difficulty pairs · 7 runs");
+    vi.mocked(dungeonsApi.leaderboard).mockRejectedValueOnce(new Error("request failed"));
+    fireEvent.change(screen.getByLabelText("Filter by character name or actor ID"), { target: { value: "25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(await screen.findByText("Dungeon runs couldn't be loaded.")).toBeInTheDocument();
+    expect(screen.queryByText("Loading dungeon runs…")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByText("3 dungeon and difficulty pairs · 7 runs");
+    expect(dungeonsApi.leaderboard).toHaveBeenLastCalledWith({ playerId: "25" });
+  });
+
+  it("does not apply a pending character lookup after Clear", async () => {
+    let completeLookup!: (result: Awaited<ReturnType<typeof playersApi.list>>) => void;
+    vi.mocked(playersApi.list).mockImplementationOnce(() => new Promise((resolve) => { completeLookup = resolve; }));
+    renderPanel();
+    await screen.findByText("3 dungeon and difficulty pairs · 7 runs");
+    fireEvent.change(screen.getByLabelText("Filter by character name or actor ID"), { target: { value: "Aster" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await act(async () => completeLookup({ rows: [{ actor_id: 25, character_name: "Aster" }], totalCount: 1, totalPlayers: 1, capabilities: {} }));
+    expect(screen.queryByText("Showing runs for")).not.toBeInTheDocument();
+    expect(dungeonsApi.leaderboard).not.toHaveBeenCalledWith({ playerId: "25" });
   });
 
   it("drops the applied player filter when a new search fails", async () => {

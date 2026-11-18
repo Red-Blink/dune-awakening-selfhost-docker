@@ -43,6 +43,7 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
   const [loadFailed, setLoadFailed] = useState(false);
   const [allEntries, setAllEntries] = useState<DungeonLeaderboardEntry[]>([]);
   const [playerEntries, setPlayerEntries] = useState<DungeonLeaderboardEntry[] | null>(null);
+  const [playerBoardFailed, setPlayerBoardFailed] = useState(false);
   const [dungeonId, setDungeonId] = useState("");
   const [difficulty, setDifficulty] = useState<number | null>(null);
   const [q, setQ] = useState("");
@@ -56,6 +57,7 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const runsRequest = useRef(0);
+  const playerSearchRequest = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -75,11 +77,16 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
   useEffect(() => {
     // Clear first so the previous player's board never shows under the new name.
     setPlayerEntries(null);
+    setPlayerBoardFailed(false);
     if (!player) return undefined;
     let active = true;
     dungeonsApi.leaderboard({ playerId: player.actorId }).then((result) => {
       if (active) setPlayerEntries(result.entries || []);
-    }).catch((error) => { if (active) onError(errorText(error)); });
+    }).catch((error) => {
+      if (!active) return;
+      setPlayerBoardFailed(true);
+      onError(errorText(error));
+    });
     return () => { active = false; };
   }, [player, onError, refreshKey]);
 
@@ -109,7 +116,7 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
     .filter((entry) => !dungeonId || entry.best.dungeonId === dungeonId)
     .map((entry) => entry.best.difficulty))].sort((a, b) => a - b), [allEntries, dungeonId]);
 
-  const playerBoardLoading = Boolean(player) && playerEntries === null;
+  const playerBoardLoading = Boolean(player) && playerEntries === null && !playerBoardFailed;
   const leaderboardRows = (player ? playerEntries ?? [] : allEntries)
     .filter((entry) => (!dungeonId || entry.best.dungeonId === dungeonId) && (difficulty === null || entry.best.difficulty === difficulty))
     .map((entry) => ({
@@ -156,19 +163,22 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
 
   async function submitPlayer() {
     if (!q.trim()) { clearPlayer(); return; }
+    const request = ++playerSearchRequest.current;
     setPlayerError("");
     try {
       const resolved = await resolvePlayer(q);
+      if (request !== playerSearchRequest.current) return;
       // A failed lookup drops the old filter so the results match what's typed.
       if (typeof resolved === "string") { setPlayerError(resolved); setPlayer(null); setPage(0); return; }
       setPlayer(resolved);
       setPage(0);
     } catch (error) {
-      onError(errorText(error));
+      if (request === playerSearchRequest.current) onError(errorText(error));
     }
   }
 
   function clearPlayer() {
+    ++playerSearchRequest.current;
     setQ("");
     setPlayer(null);
     setPlayerError("");
@@ -216,7 +226,10 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
     <div className="action-row players-search-row">
       <input
         value={q}
-        onChange={(event) => setQ(event.target.value)}
+        onChange={(event) => {
+          ++playerSearchRequest.current;
+          setQ(event.target.value);
+        }}
         onKeyDown={(event) => { if (event.key === "Enter") void submitPlayer(); }}
         placeholder="Filter by character name or actor ID"
         aria-label="Filter by character name or actor ID"
@@ -228,10 +241,10 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
     {player && <p className="action-help-note">Showing runs for <strong data-no-translate>{player.name}</strong></p>}
 
     {view === "leaderboard" ? <>
-      <p className="action-help-note">{supported === null || playerBoardLoading
+      <p className="action-help-note">{playerBoardFailed ? "Dungeon runs couldn't be loaded." : supported === null || playerBoardLoading
         ? "Loading dungeon runs…"
         : `${leaderboardRows.length.toLocaleString()} dungeon and difficulty pairs · ${total.toLocaleString()} runs`}</p>
-      <DataTable
+      {!playerBoardFailed && <DataTable
         rows={leaderboardSort.sortedRows}
         columns={["dungeon", "difficulty", "best", "party", "runs"]}
         columnLabels={{ dungeon: "Dungeon", difficulty: "Difficulty", best: "Best Time", party: "Party", runs: "Runs" }}
@@ -242,7 +255,7 @@ export function DungeonRunsPanel({ onOpenPlayer, onError }: {
         rowKey={(row) => String(row.key)}
         emptyMessage={supported === null || playerBoardLoading ? "Loading dungeon runs…" : filtered ? "No runs match these filters." : "No dungeon runs recorded."}
         renderCell={renderCell}
-      />
+      />}
     </> : <>
       <p className="action-help-note">{loading
         ? "Loading dungeon runs…"

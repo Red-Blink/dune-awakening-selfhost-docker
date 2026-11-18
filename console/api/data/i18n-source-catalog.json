@@ -4372,9 +4372,9 @@
     "{count0} dungeon and difficulty pairs · {count1} runs": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 233,
+        "line": 246,
         "nearby": [
-          "Showing runs for",
+          "Dungeon runs couldn't be loaded.",
           "Loading dungeon runs…",
           "No runs match these filters."
         ]
@@ -4434,7 +4434,7 @@
     "{count0} of {count1} runs · newest first": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 250,
+        "line": 263,
         "nearby": [
           "No dungeon runs recorded.",
           "Loading dungeon runs…",
@@ -4468,7 +4468,7 @@
     "{count0} runs · newest first": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 251,
+        "line": 264,
         "nearby": [
           "Loading dungeon runs…",
           "{count0} of {count1} runs · newest first",
@@ -6694,7 +6694,7 @@
     "All difficulties": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 211,
+        "line": 221,
         "nearby": [
           "All dungeons",
           "Difficulty",
@@ -6706,7 +6706,7 @@
     "All dungeons": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 207,
+        "line": 217,
         "nearby": [
           "Dungeon runs view",
           "Dungeon",
@@ -17641,7 +17641,7 @@
     "Difficulty": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 210,
+        "line": 220,
         "nearby": [
           "Dungeon",
           "All dungeons",
@@ -19030,7 +19030,7 @@
     "Dungeon": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 206,
+        "line": 216,
         "nearby": [
           "Refresh",
           "Dungeon runs view",
@@ -19064,7 +19064,7 @@
     "Dungeon runs aren't available on this database version.": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 197,
+        "line": 207,
         "nearby": [
           "No player matches that name.",
           "More than one player matches. Enter the full character name or actor ID.",
@@ -19076,19 +19076,29 @@
     "Dungeon runs couldn't be loaded.": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 199,
+        "line": 209,
         "nearby": [
           "More than one player matches. Enter the full character name or actor ID.",
           "Dungeon runs aren't available on this database version.",
           "Refresh",
           "Dungeon runs view"
         ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 244,
+        "nearby": [
+          "Clear",
+          "Showing runs for",
+          "Loading dungeon runs…",
+          "{count0} dungeon and difficulty pairs · {count1} runs"
+        ]
       }
     ],
     "Dungeon runs view": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 205,
+        "line": 215,
         "nearby": [
           "Dungeon runs couldn't be loaded.",
           "Refresh",
@@ -21400,7 +21410,7 @@
     "Filter by character name or actor ID": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 221,
+        "line": 234,
         "nearby": [
           "All difficulties",
           "Refresh",
@@ -21409,7 +21419,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 222,
+        "line": 235,
         "nearby": [
           "Refresh",
           "Search",
@@ -21985,7 +21995,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 270,
+        "line": 283,
         "nearby": [
           "of",
           "Rows",
@@ -26862,7 +26872,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 274,
+        "line": 287,
         "nearby": [
           "of",
           "Next"
@@ -27858,16 +27868,16 @@
     "Loading dungeon runs…": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 232,
+        "line": 245,
         "nearby": [
-          "Clear",
           "Showing runs for",
+          "Dungeon runs couldn't be loaded.",
           "{count0} dungeon and difficulty pairs · {count1} runs"
         ]
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 243,
+        "line": 256,
         "nearby": [
           "{count0} dungeon and difficulty pairs · {count1} runs",
           "No runs match these filters.",
@@ -27876,7 +27886,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 248,
+        "line": 261,
         "nearby": [
           "No runs match these filters.",
           "No dungeon runs recorded.",
@@ -27886,7 +27896,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 258,
+        "line": 271,
         "nearby": [
           "{count0} of {count1} runs · newest first",
           "{count0} runs · newest first",
@@ -30949,7 +30959,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 273,
+        "line": 286,
         "nearby": [
           "Page",
           "of",
@@ -31437,7 +31447,7 @@
     "No dungeon runs recorded.": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 243,
+        "line": 256,
         "nearby": [
           "Loading dungeon runs…",
           "No runs match these filters.",
@@ -31446,7 +31456,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 258,
+        "line": 271,
         "nearby": [
           "Loading dungeon runs…",
           "No runs match these filters.",
@@ -32184,7 +32194,7 @@
     "No runs match these filters.": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 243,
+        "line": 256,
         "nearby": [
           "{count0} dungeon and difficulty pairs · {count1} runs",
           "Loading dungeon runs…",
@@ -32193,7 +32203,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 258,
+        "line": 271,
         "nearby": [
           "{count0} runs · newest first",
           "Loading dungeon runs…",
@@ -34560,7 +34570,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 272,
+        "line": 285,
         "nearby": [
           "First",
           "Previous",
@@ -36626,7 +36636,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 271,
+        "line": 284,
         "nearby": [
           "Rows",
           "First",
@@ -42395,7 +42405,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 265,
+        "line": 278,
         "nearby": [
           "Showing",
           "of",
@@ -46680,7 +46690,7 @@
       },
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 262,
+        "line": 275,
         "nearby": [
           "No runs match these filters.",
           "No dungeon runs recorded.",
@@ -46760,12 +46770,12 @@
     "Showing runs for": [
       {
         "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
-        "line": 228,
+        "line": 241,
         "nearby": [
           "Search",
           "Clear",
-          "Loading dungeon runs…",
-          "{count0} dungeon and difficulty pairs · {count1} runs"
+          "Dungeon runs couldn't be loaded.",
+          "Loading dungeon runs…"
         ]
       }
     ],
