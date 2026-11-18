@@ -400,9 +400,8 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Steam ID")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
+      expect(screen.getByText("Steam ID")).toBeInTheDocument();
 
       expect(screen.getAllByText("Platform Identity")).toHaveLength(1);
       const identityBlock = screen.getByText("Platform Identity").closest(".summary-block");
@@ -417,6 +416,19 @@ describe("PlayerSummary", () => {
       expect(screen.getByText("FN1")).toBeInTheDocument();
       expect(screen.getByText("FLS ID")).toBeInTheDocument();
       expect(screen.getByText("user1")).toBeInTheDocument();
+    });
+  });
+
+  describe("Identity fold", () => {
+    it("starts collapsed and shows both identity tables when opened", async () => {
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Benny Jesserette", fls_id: "user1" } }} fallback={{}} />);
+      const toggle = await screen.findByRole("button", { name: /Identity/ });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("FLS ID")).not.toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("Platform Identity")).toBeInTheDocument();
+      expect(screen.getByText("Database Identity")).toBeInTheDocument();
     });
   });
 
@@ -436,9 +448,8 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Account")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
+      expect(screen.getByText("Account")).toBeInTheDocument();
 
       const block = screen.getByText("Database Identity").closest(".summary-block");
       expect(block).not.toBeNull();
@@ -469,9 +480,7 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Account")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
       const accountRow = screen.getByText("Account").closest("tr");
       expect(accountRow?.textContent).toContain("—");
       const controllerRow = screen.getByText("Player Controller").closest("tr");
@@ -498,10 +507,10 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Level")).toBeInTheDocument();
-        expect(screen.getByText("11")).toBeInTheDocument();
-        expect(screen.getByText("XP")).toBeInTheDocument();
-        expect(screen.getByText((4790).toLocaleString())).toBeInTheDocument();
+        const levelTile = screen.getByText("Level").closest(".summary-stat-level");
+        expect(levelTile).not.toBeNull();
+        expect(levelTile?.querySelector("strong")).toHaveTextContent("11");
+        expect(levelTile?.querySelector("small")).toHaveTextContent(`${(4790).toLocaleString()} XP`);
         expect(screen.getByText("Skill Points")).toBeInTheDocument();
         expect(screen.getByText("3 / 12")).toBeInTheDocument();
       });
@@ -570,13 +579,16 @@ describe("PlayerSummary", () => {
         ]
       });
       render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
-      await waitFor(() => expect(screen.getByText("Dungeon Runs")).toBeInTheDocument());
-      // The name appears in Best Times and in each run row.
-      expect(screen.getAllByText("Sand Storm")).toHaveLength(3);
+      await screen.findByText("Best Time by Difficulty");
+      // Sand Storm: its best-time row, the Highest Difficulty stat and two run rows.
+      expect(screen.getAllByText("Sand Storm")).toHaveLength(4);
       expect(screen.getAllByText("Dust")).toHaveLength(2);
-      expect(screen.getByRole("row", { name: /Sand Storm Difficulty 2 16:33/ })).toBeInTheDocument();
+      expect(screen.getByTitle("Difficulty 2")).toHaveTextContent("2 16:33");
       expect(screen.getAllByText("16:33")).toHaveLength(2);
       expect(screen.getAllByText("22:18")).toHaveLength(1);
+      expect(screen.getByText("Fastest Clear").parentElement).toHaveTextContent("Fastest Clear14:43Dust · 1");
+      expect(screen.getByText("Highest Difficulty").parentElement).toHaveTextContent("Highest Difficulty2Sand Storm");
+      expect(screen.getByText("Dungeons").parentElement).toHaveTextContent("Dungeons2");
       expect(screen.getAllByText("2 · Aster, Brin")).toHaveLength(2);
       expect(screen.getByText("1 · Controller 23")).toBeInTheDocument();
     });
@@ -596,7 +608,7 @@ describe("PlayerSummary", () => {
       expect(partyCells).toEqual(["1 · Zed", "3 · Aaron, Bea, Cy"]);
     });
 
-    it("collapses long lists to the 5 fastest best times and the 10 newest runs", async () => {
+    it("collapses a dungeon's best times to 8 chips and the run table to the 5 newest runs", async () => {
       // 12 runs over 12 difficulties of one dungeon; run N takes N minutes.
       const runs = Array.from({ length: 12 }, (_, index) => ({
         completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (index + 1) * 60_000,
@@ -604,25 +616,49 @@ describe("PlayerSummary", () => {
       }));
       vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 12, truncated: false, runs });
       render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
-      await waitFor(() => expect(screen.getByText("Dungeon Runs")).toBeInTheDocument());
-      const bestRows = () => document.querySelectorAll(".summary-dungeons-best tr");
+      await screen.findByText("Best Time by Difficulty");
+      const chips = () => document.querySelectorAll("span.summary-chip");
       const runRows = () => document.querySelectorAll(".summary-dungeons-table tbody tr");
-      expect(bestRows()).toHaveLength(5);
-      expect([...bestRows()].map((row) => row.lastElementChild?.textContent)).toEqual(["1:00", "2:00", "3:00", "4:00", "5:00"]);
-      expect(runRows()).toHaveLength(10);
-      const [bestToggle, runsToggle] = screen.getAllByRole("button", { name: "Show All 12 Items" });
-      fireEvent.click(bestToggle);
-      expect(bestRows()).toHaveLength(12);
-      fireEvent.click(runsToggle);
+      expect(chips()).toHaveLength(8);
+      expect([...chips()].map((chip) => chip.querySelector("strong")?.textContent)).toEqual(["1:00", "2:00", "3:00", "4:00", "5:00", "6:00", "7:00", "8:00"]);
+      expect(document.querySelectorAll(".summary-chip-best")).toHaveLength(1);
+      expect(document.querySelector(".summary-chip-best")).toHaveTextContent("1 1:00");
+      expect(runRows()).toHaveLength(5);
+      fireEvent.click(screen.getByRole("button", { name: "+4" }));
+      expect(chips()).toHaveLength(12);
+      fireEvent.click(screen.getByRole("button", { name: "Show Fewer Items" }));
+      expect(chips()).toHaveLength(8);
+      fireEvent.click(screen.getByRole("button", { name: "Show All 12 Items" }));
       expect(runRows()).toHaveLength(12);
-      fireEvent.click(screen.getAllByRole("button", { name: "Show Fewer Items" })[1]);
-      expect(runRows()).toHaveLength(10);
+      fireEvent.click(screen.getByRole("button", { name: "Show Fewer Items" }));
+      expect(runRows()).toHaveLength(5);
     });
 
-    it("says so when the player has no runs", async () => {
+    it("drops the dungeon card and moves Vitals and Currency into the main column when there are no runs", async () => {
       vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 0, truncated: false, runs: [] });
-      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
-      await waitFor(() => expect(screen.getByText("No dungeon runs recorded.")).toBeInTheDocument());
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
+      vi.mocked(playersApi.currency).mockResolvedValue({ capabilities: {}, rows: [{ currency_id: 1, balance: 37641, label: "Solari Credit" }] });
+      const { container } = render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Vitals")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText("Currency")).toBeInTheDocument());
+      expect(container.querySelector(".summary-dungeons")).toBeNull();
+      const pair = container.querySelector(".summary-main .summary-main-pair");
+      expect(pair).toHaveTextContent("Vitals");
+      expect(pair).toHaveTextContent("Currency");
+      expect(container.querySelector(".summary-side")).not.toHaveTextContent("Vitals");
+      expect(container.querySelector(".summary-side")).toHaveTextContent("Faction");
+    });
+
+    it("keeps Vitals and Currency in the sidebar when the dungeon card is shown", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 1, truncated: false,
+        runs: [{ completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 1, party }]
+      });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
+      const { container } = render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(container.querySelector(".summary-dungeons")).not.toBeNull());
+      await waitFor(() => expect(container.querySelector(".summary-side")).toHaveTextContent("Vitals"));
+      expect(container.querySelector(".summary-main-pair")).toBeNull();
     });
 
     it("notes truncation when only the latest runs were returned", async () => {
