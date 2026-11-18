@@ -5,6 +5,7 @@ import { DataTable, type SortDirection } from "../../components/common/DataTable
 import { SegmentedControl } from "../../components/common/SegmentedControl";
 import { DeletedCharacterAssets } from "./DeletedCharacterAssets";
 import { CombatPanel } from "./CombatPanel";
+import { DungeonRunsPanel } from "./DungeonRunsPanel";
 import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { formatAbsoluteDateTime, formatCell, formatRelativeAge } from "../../lib/display";
 import { cachedInstanceNames, resolveInstanceNames } from "../maps/instanceNames";
@@ -32,12 +33,13 @@ type PlayerStatusFilter = "all" | "online" | "offline" | "banned";
 // they cannot be rows in the players table -- selecting one there opens
 // CharacterAdminUI, which assumes an inventory, skills, a position to teleport
 // and so on. The whole body swaps instead.
-type PlayersViewMode = "active" | "deleted" | "pvp";
+type PlayersViewMode = "active" | "deleted" | "pvp" | "dungeons";
 
 const PLAYERS_VIEW_MODES = [
   { value: "active", label: "Active Players" },
   { value: "deleted", label: "Deleted Characters" },
-  { value: "pvp", label: "PvP" }
+  { value: "pvp", label: "PvP" },
+  { value: "dungeons", label: "Dungeon Runs" }
 ] as const satisfies ReadonlyArray<{ value: PlayersViewMode; label: string }>;
 
 const PLAYERS_AUTO_REFRESH_MS = 10_000;
@@ -264,6 +266,18 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
     return () => window.cancelAnimationFrame(frame);
   }, [dbPlayerId]);
 
+  // Opening a player from Dungeon Runs mounts the list at the same time, and the
+  // list and profile then load in and push the detail down; scroll once both are in.
+  const scrollToDetailAfterLoadRef = useRef(false);
+  useEffect(() => {
+    if (!scrollToDetailAfterLoadRef.current || !detail || rows.length === 0) return undefined;
+    scrollToDetailAfterLoadRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      playerDetailRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [detail, rows]);
+
   useEffect(() => {
     if (!dbPlayerId) return undefined;
     let cancelled = false;
@@ -329,6 +343,12 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
     setViewMode(next);
   }
 
+  function openFromDungeonRuns(member: { actorId: number; characterName: string | null }) {
+    scrollToDetailAfterLoadRef.current = true;
+    setViewMode("active");
+    void open({ actor_id: String(member.actorId), character_name: member.characterName ?? "" });
+  }
+
   function handleSort(column: string) {
     setPage(0);
     if (column === sortColumn) {
@@ -353,7 +373,11 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
             groupClassName="segmented-control players-view-segments"
           />
         </div>
-        {viewMode === "pvp" ? <CombatPanel /> : <DeletedCharacterAssets onOpenBase={onOpenBase} onError={onError} confirmAction={confirmAction} />}
+        {viewMode === "pvp"
+          ? <CombatPanel />
+          : viewMode === "dungeons"
+            ? <DungeonRunsPanel onOpenPlayer={openFromDungeonRuns} onError={onError} />
+            : <DeletedCharacterAssets onOpenBase={onOpenBase} onError={onError} confirmAction={confirmAction} />}
       </section>
     );
   }

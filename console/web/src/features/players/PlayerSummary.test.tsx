@@ -10,7 +10,8 @@ vi.mock("../../api/players", () => ({
     progression: vi.fn(),
     intel: vi.fn(),
     solarisCoin: vi.fn(),
-    vitals: vi.fn()
+    vitals: vi.fn(),
+    dungeons: vi.fn()
   }
 }));
 
@@ -33,6 +34,7 @@ beforeEach(() => {
   vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: {} });
+  vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: {} });
 });
 
 afterEach(() => {
@@ -550,6 +552,93 @@ describe("PlayerSummary", () => {
         expect(playersApi.intel).toHaveBeenCalledWith("91");
       });
       expect(screen.queryByText("Available Intel")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Dungeon Runs", () => {
+    const party = [{ controllerId: 23, actorId: 23, characterName: "Aster" }, { controllerId: 36, actorId: 36, characterName: "Brin" }];
+
+    it("lists every run with best times, resolved names and formatted durations", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true },
+        totalRuns: 3,
+        truncated: false,
+        runs: [
+          { completionId: 4, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 992717, playerCount: 2, party },
+          { completionId: 3, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 1337938, playerCount: 2, party },
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 883053, playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: null }] }
+        ]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Dungeon Runs")).toBeInTheDocument());
+      // The name appears in Best Times and in each run row.
+      expect(screen.getAllByText("Sand Storm")).toHaveLength(3);
+      expect(screen.getAllByText("Dust")).toHaveLength(2);
+      expect(screen.getByRole("row", { name: /Sand Storm Difficulty 2 16:33/ })).toBeInTheDocument();
+      expect(screen.getAllByText("16:33")).toHaveLength(2);
+      expect(screen.getAllByText("22:18")).toHaveLength(1);
+      expect(screen.getAllByText("2 · Aster, Brin")).toHaveLength(2);
+      expect(screen.getByText("1 · Controller 23")).toBeInTheDocument();
+    });
+
+    it("sorts the Party column by party size, not by names", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 2, truncated: false,
+        runs: [
+          { completionId: 2, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 3, party: [{ controllerId: 1, actorId: 1, characterName: "Aaron" }, { controllerId: 2, actorId: 2, characterName: "Bea" }, { controllerId: 3, actorId: 3, characterName: "Cy" }] },
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 2000, playerCount: 1, party: [{ controllerId: 4, actorId: 4, characterName: "Zed" }] }
+        ]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Zed" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("1 · Zed")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("columnheader", { name: /Party/ }).querySelector("button") ?? screen.getByRole("columnheader", { name: /Party/ }));
+      const partyCells = screen.getAllByText(/^\d · /).map((cell) => cell.textContent);
+      expect(partyCells).toEqual(["1 · Zed", "3 · Aaron, Bea, Cy"]);
+    });
+
+    it("collapses long lists to the 5 fastest best times and the 10 newest runs", async () => {
+      // 12 runs over 12 difficulties of one dungeon; run N takes N minutes.
+      const runs = Array.from({ length: 12 }, (_, index) => ({
+        completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (index + 1) * 60_000,
+        playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: "Aster" }]
+      }));
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 12, truncated: false, runs });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Dungeon Runs")).toBeInTheDocument());
+      const bestRows = () => document.querySelectorAll(".summary-dungeons-best tr");
+      const runRows = () => document.querySelectorAll(".summary-dungeons-table tbody tr");
+      expect(bestRows()).toHaveLength(5);
+      expect([...bestRows()].map((row) => row.lastElementChild?.textContent)).toEqual(["1:00", "2:00", "3:00", "4:00", "5:00"]);
+      expect(runRows()).toHaveLength(10);
+      const [bestToggle, runsToggle] = screen.getAllByRole("button", { name: "Show all 12 items" });
+      fireEvent.click(bestToggle);
+      expect(bestRows()).toHaveLength(12);
+      fireEvent.click(runsToggle);
+      expect(runRows()).toHaveLength(12);
+      fireEvent.click(screen.getAllByRole("button", { name: "Show fewer items" })[1]);
+      expect(runRows()).toHaveLength(10);
+    });
+
+    it("says so when the player has no runs", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 0, truncated: false, runs: [] });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("No dungeon runs recorded.")).toBeInTheDocument());
+    });
+
+    it("notes truncation when only the latest runs were returned", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 501, truncated: true,
+        runs: [{ completionId: 9, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 1, party }]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Showing the latest 1 runs.")).toBeInTheDocument());
+    });
+
+    it("hides the block when the schema has no dungeon tables", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: false }, reason: "Unsupported" });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(playersApi.dungeons).toHaveBeenCalledWith("91"));
+      expect(screen.queryByText("Dungeon Runs")).not.toBeInTheDocument();
     });
   });
 

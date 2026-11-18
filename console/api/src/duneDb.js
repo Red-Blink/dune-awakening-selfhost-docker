@@ -3145,6 +3145,151 @@ export async function playerVitals(db, id) {
   };
 }
 
+const MAX_DUNGEON_RUNS = 500;
+
+// dungeon_completion_players.player_id is the Player Controller actor id, and
+// dungeon_completion has no timestamp, so completion_id is the only recency order.
+export async function playerDungeons(db, id) {
+  if (!(await supportsDungeonCompletions(db))) {
+    return unsupported("dungeons", ["dune.dungeon_completion", "dune.dungeon_completion_players"]);
+  }
+  const player = await resolvePlayerTargetCached(db, id);
+  // resolvePlayerTarget falls back to controller 0; never match rows keyed on it.
+  if (!player.controllerId) return { capabilities: { dungeons: true }, player, totalRuns: 0, truncated: false, runs: [] };
+  const [runsResult, totalResult] = await Promise.all([
+    db.query(`
+      select dc.completion_id, dc.dungeon_id, dc.difficulty, dc.duration_ms, dc.players_num,
+             coalesce(party.members, '[]'::json) as party
+      from dune.dungeon_completion_players me
+      join dune.dungeon_completion dc on dc.completion_id = me.completion_id
+      ${DUNGEON_PARTY_LATERAL}
+      where me.player_id = $1::bigint
+      order by dc.completion_id desc
+      limit ${MAX_DUNGEON_RUNS}`, [player.controllerId]),
+    db.query(`select count(*)::int as total from dune.dungeon_completion_players where player_id = $1::bigint`, [player.controllerId])
+  ]);
+  const runs = runsResult.rows.map(mapDungeonRun);
+  const totalRuns = Number(totalResult.rows[0]?.total || 0);
+  return { capabilities: { dungeons: true }, player, totalRuns, truncated: totalRuns > runs.length, runs };
+}
+
+const DUNGEON_PARTY_LATERAL = `
+  left join lateral (
+    select json_agg(json_build_object('controllerId', p.player_id, 'actorId', ps.player_pawn_id,
+                                      'characterName', ps.character_name)
+                    order by p.player_id) as members
+    from dune.dungeon_completion_players p
+    left join dune.player_state ps on ps.player_controller_id = p.player_id
+    where p.completion_id = dc.completion_id
+  ) party on true`;
+
+function mapDungeonRun(row) {
+  return {
+    completionId: Number(row.completion_id),
+    dungeonId: String(row.dungeon_id || ""),
+    difficulty: Number(row.difficulty),
+    durationMs: Number(row.duration_ms),
+    playerCount: Number(row.players_num),
+    party: (Array.isArray(row.party) ? row.party : []).map((member) => ({
+      controllerId: Number(member.controllerId),
+      actorId: member.actorId === null || member.actorId === undefined ? null : Number(member.actorId),
+      characterName: member.characterName ?? null
+    }))
+  };
+}
+
+// Optional filters shared by the server-wide dungeon routes. playerId is a
+// player (pawn) actor id, resolved to the controller id the completion rows use.
+async function dungeonRunFilters(db, { dungeonId = "", difficulty = "", playerId = "" } = {}) {
+  const values = [];
+  const clauses = [];
+  const trimmedDungeon = String(dungeonId || "").trim();
+  if (trimmedDungeon) {
+    values.push(trimmedDungeon);
+    clauses.push(`dc.dungeon_id = $${values.length}`);
+  }
+  if (difficulty !== "" && difficulty !== null && difficulty !== undefined) {
+    values.push(intParam(difficulty, "difficulty", 0, 1000));
+    clauses.push(`dc.difficulty = $${values.length}`);
+  }
+  let player = null;
+  if (playerId !== "" && playerId !== null && playerId !== undefined) {
+    player = await resolvePlayerTargetCached(db, playerId);
+    values.push(player.controllerId);
+    clauses.push(`exists (select 1 from dune.dungeon_completion_players f where f.completion_id = dc.completion_id and f.player_id = $${values.length}::bigint)`);
+  }
+  return { values, where: clauses.length ? clauses.join(" and ") : "true", player };
+}
+
+export async function listDungeonRuns(db, { page = 0, pageSize = 50, ...filters } = {}) {
+  if (!(await supportsDungeonCompletions(db))) {
+    return { ...unsupported("dungeons", ["dune.dungeon_completion", "dune.dungeon_completion_players"]), runs: [], totalCount: 0, totalRuns: 0 };
+  }
+  const safePageSize = intParam(pageSize, "pageSize", 1, 500);
+  const safePage = intParam(page, "page", 0);
+  const { values, where, player } = await dungeonRunFilters(db, filters);
+  if (player && !player.controllerId) {
+    return { capabilities: { dungeons: true }, page: safePage, pageSize: safePageSize, totalCount: 0, totalRuns: await countAllDungeonRuns(db), runs: [] };
+  }
+  values.push(safePageSize, safePage * safePageSize);
+  const [result, totalRuns] = await Promise.all([db.query(`
+    with matched as (
+      select dc.completion_id from dune.dungeon_completion dc where ${where}
+    ),
+    totals as (select count(*)::int as total_count from matched)
+    select paged.*, totals.total_count
+    from totals
+    left join lateral (
+      select dc.completion_id, dc.dungeon_id, dc.difficulty, dc.duration_ms, dc.players_num,
+             coalesce(party.members, '[]'::json) as party
+      from matched m
+      join dune.dungeon_completion dc on dc.completion_id = m.completion_id
+      ${DUNGEON_PARTY_LATERAL}
+      order by dc.completion_id desc
+      limit $${values.length - 1} offset $${values.length}
+    ) paged on true
+    order by paged.completion_id desc`, values), countAllDungeonRuns(db)]);
+  return {
+    capabilities: { dungeons: true },
+    page: safePage,
+    pageSize: safePageSize,
+    totalCount: Number(result.rows[0]?.total_count || 0),
+    totalRuns,
+    runs: result.rows.filter((row) => row.completion_id !== null && row.completion_id !== undefined).map(mapDungeonRun)
+  };
+}
+
+async function countAllDungeonRuns(db) {
+  const result = await db.query("select count(*)::int as total_runs from dune.dungeon_completion");
+  return Number(result.rows[0]?.total_runs || 0);
+}
+
+// Fastest run per dungeon and difficulty; ties go to the earlier run.
+export async function dungeonLeaderboard(db, filters = {}) {
+  if (!(await supportsDungeonCompletions(db))) {
+    return { ...unsupported("dungeons", ["dune.dungeon_completion", "dune.dungeon_completion_players"]), entries: [] };
+  }
+  const { values, where, player } = await dungeonRunFilters(db, filters);
+  if (player && !player.controllerId) return { capabilities: { dungeons: true }, entries: [] };
+  const result = await db.query(`
+    with ranked as (
+      select distinct on (dc.dungeon_id, dc.difficulty)
+             dc.completion_id, dc.dungeon_id, dc.difficulty, dc.duration_ms, dc.players_num,
+             count(*) over (partition by dc.dungeon_id, dc.difficulty)::int as run_count
+      from dune.dungeon_completion dc
+      where ${where}
+      order by dc.dungeon_id, dc.difficulty, dc.duration_ms asc, dc.completion_id asc
+    )
+    select dc.*, coalesce(party.members, '[]'::json) as party
+    from ranked dc
+    ${DUNGEON_PARTY_LATERAL}
+    order by dc.dungeon_id, dc.difficulty`, values);
+  return {
+    capabilities: { dungeons: true },
+    entries: result.rows.map((row) => ({ runCount: Number(row.run_count || 0), best: mapDungeonRun(row) }))
+  };
+}
+
 // dune.specialization_keystones_map has no track column; the track is the name prefix
 // (e.g. "Combat_CombatKeystone_SkillPoint4" belongs to the Combat track).
 async function specializationKeystoneCounts(db, controllerId) {
@@ -14698,6 +14843,7 @@ async function playerCapabilities(db) {
     refuelVehicle: await supportsRefuelVehicle(db),
     vitals: await supportsPlayerVitals(db),
     progression: await supportsPlayerProgression(db),
+    dungeons: await supportsDungeonCompletions(db),
     events: false,
     stats: false,
     history: false
@@ -14715,6 +14861,10 @@ async function supportsPlayerVitals(db) {
       !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) return false;
   const actorColumns = await columnsFor(db, "actors");
   return actorColumns.has("gas_attributes");
+}
+
+async function supportsDungeonCompletions(db) {
+  return (await tableExists(db, "dungeon_completion")) && (await tableExists(db, "dungeon_completion_players"));
 }
 
 async function supportsPlayerProgression(db) {
