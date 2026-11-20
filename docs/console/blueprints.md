@@ -8,6 +8,11 @@ The Blueprints feature allows server admins to import, export, list, and delete
 player building blueprints through the admin console. Blueprints are stored as
 `BuildingBlueprint_CopyDevice` solido items in the player's backpack inventory.
 
+Database updates preserve equipment rotations already stored on blueprint
+items. If a legacy import already has tilted equipment, install a fresh item
+from the original blueprint file. Reimporting does not move projections
+already placed in the world.
+
 ## Architecture
 
 ```
