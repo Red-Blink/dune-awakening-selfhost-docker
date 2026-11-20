@@ -110,6 +110,18 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     { label: "Admin", icon: ShieldCheck }
   ];
   const [playerAdmin_activeTab, playerAdmin_setActiveTab] = useState("Character");
+  const [playerAdmin_teleportFocusKey, playerAdmin_setTeleportFocusKey] = useState(0);
+  const playerAdmin_teleportRef = useRef<HTMLDivElement>(null);
+  const playerAdmin_teleportScrollPending = useRef(false);
+  useEffect(() => {
+    if (!playerAdmin_teleportScrollPending.current || playerAdmin_activeTab !== "Admin") return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      if (!playerAdmin_teleportRef.current) return;
+      playerAdmin_teleportScrollPending.current = false;
+      playerAdmin_teleportRef.current.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [playerAdmin_activeTab, playerAdmin_teleportFocusKey]);
   const [playerAdmin_openToggles, playerAdmin_setOpenToggles] = useState<Record<string, boolean>>({ quick_rewards: true });
   const [playerAdmin_inventoryData, playerAdmin_setInventoryData] = useState<Record<string, unknown> | null>(null);
   const [playerAdmin_inventoryFilter, playerAdmin_setInventoryFilter] = useState("");
@@ -1158,10 +1170,29 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     });
   }
 
+  async function playerAdmin_kickPlayer() {
+    if (!(await confirmAction(`Kick ${playerName} from the server?`))) return;
+    void playerAdmin_runAction("adminKick", `Kicking ${playerName}`, () => playerAdmin_runTask(() => playersApi.kick(actionPlayerId)), `${playerName} was kicked from the server.`, { actionType: "Kick Player", target: playerName, amount: "1" }, "danger");
+  }
+
+  // Teleport needs a destination, so the summary's Teleport button opens the
+  // Admin tab's teleport controls rather than running anything itself.
+  function playerAdmin_openTeleport() {
+    playerAdmin_teleportScrollPending.current = true;
+    playerAdmin_setActiveTab("Admin");
+    playerAdmin_setTeleportFocusKey((key) => key + 1);
+  }
+
+  const playerAdmin_summaryActions = <div className="summary-hero-actions">
+    <button type="button" onClick={playerAdmin_openTeleport}>Teleport</button>
+    <button type="button" className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_kickPlayer()}>Kick Player</button>
+    <InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" />
+  </div>;
+
   return (
     <section className="playerAdmin_container" aria-label="Player admin layout">
       <div className="playerAdmin_header"><h3>Player Summary</h3><button onClick={onClose}>Close</button></div>
-      <PlayerSummary detail={detail} fallback={fallback} dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} refreshKey={playerAdmin_summaryRefreshKey} onRepairFactionReputation={playerAdmin_repairFactionReputation} factionRepairDisabled={!dbPlayerId || playerAdmin_isOnline} factionRepairResult={playerAdmin_actionResult?.key === "repairFactionReputation" ? playerAdmin_actionResult : null} />
+      <PlayerSummary detail={detail} fallback={fallback} dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} refreshKey={playerAdmin_summaryRefreshKey} onRepairFactionReputation={playerAdmin_repairFactionReputation} factionRepairDisabled={!dbPlayerId || playerAdmin_isOnline} factionRepairResult={playerAdmin_actionResult?.key === "repairFactionReputation" ? playerAdmin_actionResult : null} actions={playerAdmin_summaryActions} />
       <div className="playerAdmin_tabs" role="group" aria-label="Player admin sections">{playerAdmin_tabs.map((playerAdmin_tab) => {
         const TabIcon = playerAdmin_tab.icon;
         return <button key={playerAdmin_tab.label} aria-pressed={playerAdmin_activeTab === playerAdmin_tab.label} className={playerAdmin_activeTab === playerAdmin_tab.label ? "active" : ""} onClick={() => playerAdmin_setActiveTab(playerAdmin_tab.label)}><TabIcon size={17} aria-hidden="true" /><span>{playerAdmin_tab.label}</span></button>;
@@ -1364,10 +1395,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
           ]
         }))) return;
         void playerAdmin_runAction("repairLoginQueue", `Repairing ${playerName}'s login queue`, () => playerAdmin_runTask(() => playersApi.repairLoginQueue(actionPlayerId, "REPAIR LOGIN QUEUE")), `${playerName}'s login queue was repaired. Ask the player to connect again.`, { actionType: "Repair Login Queue", target: playerName, amount: "1" });
-      }}>Repair Login Queue</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
-        if (!(await confirmAction(`Kick ${playerName} from the server?`))) return;
-        void playerAdmin_runAction("adminKick", `Kicking ${playerName}`, () => playerAdmin_runTask(() => playersApi.kick(actionPlayerId)), `${playerName} was kicked from the server.`, { actionType: "Kick Player", target: playerName, amount: "1" }, "danger");
-      }}>Kick Player</button><button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
+      }}>Repair Login Queue</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_kickPlayer()}>Kick Player</button><button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
         if (playerAdmin_isBanned) {
           if (!(await confirmAction(`Unban ${playerName}? This account will be allowed to connect again.`, {
             title: "Unban Player",
@@ -1394,7 +1422,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       }}>Wipe Inventory</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
         if (!(await confirmAction(`Reset ${playerName}'s progression?`))) return;
         void playerAdmin_runAction("adminReset", `Resetting ${playerName}'s progression`, () => playerAdmin_runTask(() => playersApi.resetProgression(actionPlayerId, "RESET PROGRESSION")), `${playerName}'s progression was reset.`, { actionType: "Reset Progression", target: playerName, amount: "1" }, "danger");
-      }}>Reset Progression</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairLoginQueue" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminBan" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminUnban" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminWipe" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminReset" /></div></div></section><section className="playerAdmin_box"><h4>Movement / Vehicles</h4><PlayerTeleportControls playerId={dbPlayerId} playerName={playerName} isOnline={playerAdmin_isOnline} confirmAction={confirmAction} onRefresh={onRefresh} onActionLog={playerAdmin_addLog} /><div className="playerAdmin_actionRow playerAdmin_spawnVehicleRow"><span>Spawn Vehicle</span><select value={playerAdmin_vehicleId} onChange={(event) => { const nextVehicle = event.target.value; playerAdmin_setVehicleId(nextVehicle); playerAdmin_setVehicleTemplate([...(playerAdmin_vehicleCatalog[nextVehicle] || [])].sort((a, b) => friendlyVehicleTemplateName(a).localeCompare(friendlyVehicleTemplateName(b)))[0] || ""); }}>{playerAdmin_vehicleIds.length === 0 && <option value="">Manual Vehicle ID</option>}{playerAdmin_vehicleIds.map((id) => <option key={id} value={id}>{friendlyVehicleName(id)}</option>)}</select><select value={playerAdmin_vehicleTemplate} onChange={(event) => playerAdmin_setVehicleTemplate(event.target.value)}>{playerAdmin_selectedTemplates.length === 0 && <option value="">Manual Template</option>}{playerAdmin_selectedTemplates.map((template) => <option key={template} value={template}>{friendlyVehicleTemplateName(template)}</option>)}</select><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
+      }}>Reset Progression</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairLoginQueue" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminBan" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminUnban" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminWipe" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminReset" /></div></div></section><section className="playerAdmin_box"><h4>Movement / Vehicles</h4><div ref={playerAdmin_teleportRef} className="playerAdmin_teleportAnchor"><PlayerTeleportControls playerId={dbPlayerId} playerName={playerName} isOnline={playerAdmin_isOnline} confirmAction={confirmAction} onRefresh={onRefresh} onActionLog={playerAdmin_addLog} /></div><div className="playerAdmin_actionRow playerAdmin_spawnVehicleRow"><span>Spawn Vehicle</span><select value={playerAdmin_vehicleId} onChange={(event) => { const nextVehicle = event.target.value; playerAdmin_setVehicleId(nextVehicle); playerAdmin_setVehicleTemplate([...(playerAdmin_vehicleCatalog[nextVehicle] || [])].sort((a, b) => friendlyVehicleTemplateName(a).localeCompare(friendlyVehicleTemplateName(b)))[0] || ""); }}>{playerAdmin_vehicleIds.length === 0 && <option value="">Manual Vehicle ID</option>}{playerAdmin_vehicleIds.map((id) => <option key={id} value={id}>{friendlyVehicleName(id)}</option>)}</select><select value={playerAdmin_vehicleTemplate} onChange={(event) => playerAdmin_setVehicleTemplate(event.target.value)}>{playerAdmin_selectedTemplates.length === 0 && <option value="">Manual Template</option>}{playerAdmin_selectedTemplates.map((template) => <option key={template} value={template}>{friendlyVehicleTemplateName(template)}</option>)}</select><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
         const knownTemplates = Object.values(playerAdmin_vehicleCatalog).flat();
         if (knownTemplates.includes(playerAdmin_vehicleId) && !playerAdmin_vehicleCatalog[playerAdmin_vehicleId]) {
           playerAdmin_showResult("adminVehicle", `${playerAdmin_vehicleId} is a vehicle template, not a vehicle ID.`, "danger");
