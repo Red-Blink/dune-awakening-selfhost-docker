@@ -609,9 +609,9 @@ describe("PlayerSummary", () => {
     });
 
     it("collapses a dungeon's best times to 8 chips and the run table to the 5 newest runs", async () => {
-      // 12 runs over 12 difficulties of one dungeon; run N takes N minutes.
+      // The oldest run is also the fastest and should stay visible in the chip list.
       const runs = Array.from({ length: 12 }, (_, index) => ({
-        completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (index + 1) * 60_000,
+        completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (12 - index) * 60_000,
         playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: "Aster" }]
       }));
       vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 12, truncated: false, runs });
@@ -620,10 +620,12 @@ describe("PlayerSummary", () => {
       const chips = () => document.querySelectorAll("span.summary-chip");
       const runRows = () => document.querySelectorAll(".summary-dungeons-table tbody tr");
       expect(chips()).toHaveLength(8);
-      expect([...chips()].map((chip) => chip.querySelector("strong")?.textContent)).toEqual(["1:00", "2:00", "3:00", "4:00", "5:00", "6:00", "7:00", "8:00"]);
+      expect([...chips()].map((chip) => chip.querySelector("strong")?.textContent)).toEqual(["12:00", "11:00", "10:00", "9:00", "8:00", "7:00", "6:00", "1:00"]);
       expect(document.querySelectorAll(".summary-chip-best")).toHaveLength(1);
-      expect(document.querySelector(".summary-chip-best")).toHaveTextContent("1 1:00");
+      expect(document.querySelector(".summary-chip-best")).toHaveTextContent("12 1:00");
       expect(runRows()).toHaveLength(5);
+      fireEvent.click(screen.getByRole("columnheader", { name: "Duration" }));
+      expect([...runRows()].map((row) => row.querySelector('td[data-column="duration"]')?.textContent)).toEqual(["8:00", "9:00", "10:00", "11:00", "12:00"]);
       fireEvent.click(screen.getByRole("button", { name: "+4" }));
       expect(chips()).toHaveLength(12);
       fireEvent.click(screen.getByRole("button", { name: "Show Fewer Items" }));

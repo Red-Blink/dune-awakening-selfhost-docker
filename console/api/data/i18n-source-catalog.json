@@ -6561,7 +6561,7 @@
     "Alignment": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 338,
+        "line": 342,
         "nearby": [
           "Show All {count0} Items",
           "Faction",
@@ -15896,7 +15896,7 @@
     "Database Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 376,
+        "line": 380,
         "nearby": [
           "Show",
           "Platform Identity"
@@ -20220,7 +20220,7 @@
     "Est. Rank": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 347,
+        "line": 351,
         "nearby": [
           "Faction Standings",
           "Rep",
@@ -21034,7 +21034,7 @@
     "Faction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 336,
+        "line": 340,
         "nearby": [
           "Show Fewer Items",
           "Show All {count0} Items",
@@ -21080,7 +21080,7 @@
     "Faction Standings": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 341,
+        "line": 345,
         "nearby": [
           "Faction",
           "Alignment",
@@ -24288,7 +24288,7 @@
     "Hide": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 369,
+        "line": 373,
         "nearby": [
           "Repair Faction",
           "Identity",
@@ -24642,7 +24642,7 @@
     "Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 368,
+        "line": 372,
         "nearby": [
           "Player Must Be Offline",
           "Repair Faction",
@@ -35561,7 +35561,7 @@
     "Platform Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 372,
+        "line": 376,
         "nearby": [
           "Hide",
           "Show",
@@ -35833,7 +35833,7 @@
     "Player Must Be Offline": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 357,
+        "line": 361,
         "nearby": [
           "Restore earned faction progression and synchronize reputation.",
           "Repairing…",
@@ -38109,7 +38109,7 @@
     "Recent Runs": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 306,
+        "line": 310,
         "nearby": [
           "Best Time by Difficulty",
           "Show Fewer Items",
@@ -39733,7 +39733,7 @@
     "Rep": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 346,
+        "line": 350,
         "nearby": [
           "Alignment",
           "Faction Standings",
@@ -39779,7 +39779,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 357,
+        "line": 361,
         "nearby": [
           "Repairing…",
           "Player Must Be Offline",
@@ -39958,7 +39958,7 @@
     "Repairing…": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 357,
+        "line": 361,
         "nearby": [
           "The player must be fully offline before their faction state can be repaired.",
           "Restore earned faction progression and synchronize reputation.",
@@ -41550,7 +41550,7 @@
     "Restore earned faction progression and synchronize reputation.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 355,
+        "line": 359,
         "nearby": [
           "Story Limit",
           "The player must be fully offline before their faction state can be repaired.",
@@ -46570,7 +46570,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 369,
+        "line": 373,
         "nearby": [
           "Identity",
           "Hide",
@@ -46594,7 +46594,7 @@
     "Show All {count0} Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 327,
+        "line": 331,
         "nearby": [
           "Recent Runs",
           "Show Fewer Items",
@@ -46662,7 +46662,7 @@
     "Show Fewer Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 304,
+        "line": 308,
         "nearby": [
           "Showing the latest {count0} runs.",
           "Best Time by Difficulty",
@@ -46671,7 +46671,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 327,
+        "line": 331,
         "nearby": [
           "Recent Runs",
           "Show All {count0} Items",
@@ -48598,7 +48598,7 @@
     "Story Limit": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 349,
+        "line": 353,
         "nearby": [
           "Rep",
           "Est. Rank",
@@ -50607,7 +50607,7 @@
     "The player must be fully offline before their faction state can be repaired.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 355,
+        "line": 359,
         "nearby": [
           "Est. Rank",
           "Story Limit",

@@ -185,7 +185,8 @@ export function PlayerSummary({
     party: run.playerCount,
     partyNames: run.party.map((member) => member.characterName || `Controller ${member.controllerId}`).join(", ")
   }));
-  const dungeonSort = useSortableRows(dungeonRows);
+  const recentDungeonRows = showAllDungeonRuns ? dungeonRows : dungeonRows.slice(0, DUNGEON_RUNS_PREVIEW_LIMIT);
+  const dungeonSort = useSortableRows(recentDungeonRows);
   type DungeonRow = (typeof dungeonRows)[number];
   const bestDungeonTimes = Object.values(dungeonRows.reduce<Record<string, DungeonRow>>((best, row) => {
     const key = `${row.dungeonId}:${row.difficulty}`;
@@ -206,7 +207,6 @@ export function PlayerSummary({
   const hasHiddenChips = bestByDungeon.some((group) => group.entries.length > BEST_TIME_CHIP_LIMIT);
   const hardest = bestDungeonTimes.reduce<DungeonRow | null>((top, row) => (!top || row.difficulty > top.difficulty || (row.difficulty === top.difficulty && row.duration < top.duration) ? row : top), null);
   const fastestClear = bestDungeonTimes.reduce<DungeonRow | null>((top, row) => (!top || row.duration < top.duration ? row : top), null);
-  const visibleDungeonRows = showAllDungeonRuns ? dungeonSort.sortedRows : dungeonSort.sortedRows.slice(0, DUNGEON_RUNS_PREVIEW_LIMIT);
   const showStats = Boolean(progression) || intel !== null || Boolean(dungeonRuns);
   const showCurrency = currencyRows.length > 0 || solarisCoinTotal !== null;
   // Without a dungeon card the main column would sit mostly empty, so Vitals and Currency move into it.
@@ -286,7 +286,11 @@ export function PlayerSummary({
             <div className="summary-block-label summary-sublabel">Best Time by Difficulty</div>
             <div className="summary-best-list">
               {bestByDungeon.map((group) => {
-                const visible = showAllBestTimes ? group.entries : group.entries.slice(0, BEST_TIME_CHIP_LIMIT);
+                const fastestIndex = group.entries.findIndex((row) => row.difficulty === group.fastestDifficulty);
+                const visible = showAllBestTimes ? group.entries : group.entries.filter((_, index) =>
+                  fastestIndex < BEST_TIME_CHIP_LIMIT
+                    ? index < BEST_TIME_CHIP_LIMIT
+                    : index < BEST_TIME_CHIP_LIMIT - 1 || index === fastestIndex);
                 const hidden = group.entries.length - visible.length;
                 return <div className="summary-best-row" key={group.dungeonId}>
                   <span className="summary-best-name" title={group.dungeonId} data-no-translate>{group.dungeon}</span>
@@ -305,7 +309,7 @@ export function PlayerSummary({
 
             <div className="summary-block-label summary-sublabel">Recent Runs</div>
             <DataTable
-              rows={visibleDungeonRows}
+              rows={dungeonSort.sortedRows}
               columns={["dungeon", "difficulty", "duration", "party"]}
               columnLabels={{ dungeon: "Dungeon", difficulty: "Difficulty", duration: "Duration", party: "Party" }}
               sortColumn={dungeonSort.sortColumn}
