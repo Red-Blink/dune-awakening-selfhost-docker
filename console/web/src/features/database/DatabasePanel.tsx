@@ -450,7 +450,7 @@ export function DatabasePanel() {
   const querySort = useSortableRows(queryRows);
   return <LayoutZone page="Database" className="panel">
     <h2 className="wide">Database Browser</h2>
-    <LayoutWidget id="database.controls" title="Database Status, Password & SSH Tunnel">
+    <LayoutWidget id="database.controls" widgetTitle="Database Status, Password & SSH Tunnel">
     <p className="database-browser-note">
       Database edits may require relog or map/server restart.
     </p>
@@ -513,7 +513,7 @@ export function DatabasePanel() {
       {!databaseStatusLoading && !databaseStatusError && tunnelAccess?.available !== true && <p className="danger-note">The console is using a non-loopback database connection, so tunnel instructions are unavailable. No public binding will be created automatically.</p>}
     </section>}
     </LayoutWidget>
-    <LayoutWidget id="database.tables" title="Tables & Row Preview">
+    <LayoutWidget id="database.tables" widgetTitle="Tables & Row Preview">
     <h3>Tables</h3>
     <div className="action-row database-table-search-row">
       <input value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="Search table names" />
@@ -587,12 +587,12 @@ export function DatabasePanel() {
       />}
     </section>}
     </LayoutWidget>
-    <LayoutWidget id="database.search" title="Global Column Search">
+    <LayoutWidget id="database.search" widgetTitle="Global Column Search">
     <h3>Search Tables and Columns</h3>
     <div className="action-row"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tables or columns" /><button onClick={searchColumns}>Search</button></div>
     {searchRan && (searchRows.length ? <DataTable rows={searchSort.sortedRows} sortColumn={searchSort.sortColumn} sortDirection={searchSort.sortDirection} onSort={searchSort.onSort} /> : <div className="empty database-empty">No matching tables or columns found.</div>)}
     </LayoutWidget>
-    <LayoutWidget id="database.sql" title="Database Objects & SQL Console">
+    <LayoutWidget id="database.sql" widgetTitle="Database Objects & SQL Console">
     <div className={`playerAdmin_toggle database-schema-section ${schemaBrowserOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={schemaBrowserOpen ? "Collapse Database Objects" : "Expand Database Objects"} onClick={() => setSchemaBrowserOpen(!schemaBrowserOpen)}>{schemaBrowserOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Database Objects</span></button>
       {schemaBrowserOpen && <div className="playerAdmin_toggleBody">

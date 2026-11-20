@@ -56,25 +56,25 @@ import { useSkinConfig } from "./useSkinConfig";
 
 type StudioTab = "presets" | "colors" | "design" | "shell" | "navigation" | "widgets";
 
-const STUDIO_TABS: { id: StudioTab; label: string; icon: React.ReactNode }[] = [
-  { id: "presets", label: "Skin Presets", icon: <Sparkles size={15} /> },
-  { id: "colors", label: "Colors & Tokens", icon: <Palette size={15} /> },
-  { id: "design", label: "Typography & Shapes", icon: <Sliders size={15} /> },
-  { id: "shell", label: "Shell Structure", icon: <Layout size={15} /> },
-  { id: "navigation", label: "Navigation Builder", icon: <Menu size={15} /> },
-  { id: "widgets", label: "Object & Widget Layout", icon: <Columns size={15} /> },
+const STUDIO_TABS: { id: StudioTab; text: string; icon: React.ReactNode }[] = [
+  { id: "presets", text: "Skin Presets", icon: <Sparkles size={15} /> },
+  { id: "colors", text: "Colors & Tokens", icon: <Palette size={15} /> },
+  { id: "design", text: "Typography & Shapes", icon: <Sliders size={15} /> },
+  { id: "shell", text: "Shell Structure", icon: <Layout size={15} /> },
+  { id: "navigation", text: "Navigation Builder", icon: <Menu size={15} /> },
+  { id: "widgets", text: "Object & Widget Layout", icon: <Columns size={15} /> },
 ];
 
-const CORE_TOKEN_OVERRIDE_FIELDS: { token: string; label: string }[] = [
-  { token: "--title", label: "Headings & Titles (--title)" },
-  { token: "--text", label: "Body Text (--text)" },
-  { token: "--text-strong", label: "Strong Text (--text-strong)" },
-  { token: "--muted", label: "Muted Labels (--muted)" },
-  { token: "--border", label: "Panel Border (--border)" },
-  { token: "--border-strong", label: "Control Border (--border-strong)" },
-  { token: "--success", label: "Success Accent (--success)" },
-  { token: "--warning", label: "Warning Accent (--warning)" },
-  { token: "--danger", label: "Danger Accent (--danger)" },
+const CORE_TOKEN_OVERRIDE_FIELDS: { token: string; text: string }[] = [
+  { token: "--title", text: "Headings & Titles (--title)" },
+  { token: "--text", text: "Body Text (--text)" },
+  { token: "--text-strong", text: "Strong Text (--text-strong)" },
+  { token: "--muted", text: "Muted Labels (--muted)" },
+  { token: "--border", text: "Panel Border (--border)" },
+  { token: "--border-strong", text: "Control Border (--border-strong)" },
+  { token: "--success", text: "Success Accent (--success)" },
+  { token: "--warning", text: "Warning Accent (--warning)" },
+  { token: "--danger", text: "Danger Accent (--danger)" },
 ];
 
 export function SkinStudioModal({ onClose }: { onClose: () => void }) {
@@ -248,6 +248,7 @@ export function SkinStudioModal({ onClose }: { onClose: () => void }) {
   return createPortal(
     <div
       className="modal-overlay skin-studio-overlay"
+      data-no-translate
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -359,7 +360,7 @@ export function SkinStudioModal({ onClose }: { onClose: () => void }) {
                 onClick={() => setTab(item.id)}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span>{item.text}</span>
               </button>
             ))}
           </nav>
@@ -633,11 +634,11 @@ export function SkinStudioModal({ onClose }: { onClose: () => void }) {
 
                       <h4>Fine-Grained Token Overrides (Optional)</h4>
                       <div className="skin-color-grid">
-                        {CORE_TOKEN_OVERRIDE_FIELDS.map(({ token, label }) => {
+                        {CORE_TOKEN_OVERRIDE_FIELDS.map(({ token, text }) => {
                           const currentVal = draft.customColors.tokenOverrides[token] || "";
                           return (
                             <label key={token} className="skin-color-picker-field">
-                              <span>{label}</span>
+                              <span>{text}</span>
                               <div className="skin-color-input-pair">
                                 <input
                                   type="color"

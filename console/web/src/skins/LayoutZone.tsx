@@ -60,11 +60,11 @@ interface LayoutZoneContextValue {
 const LayoutZoneContext = createContext<LayoutZoneContextValue | null>(null);
 export const CrossPageWidgetRendererContext = createContext<((widget: WidgetInstanceConfig) => ReactNode) | null>(null);
 
-const SPAN_OPTIONS: { value: WidgetSpan; label: string }[] = [
-  { value: 4, label: "1/3" },
-  { value: 6, label: "1/2" },
-  { value: 8, label: "2/3" },
-  { value: 12, label: "Full" },
+const SPAN_OPTIONS: { value: WidgetSpan; text: string }[] = [
+  { value: 4, text: "1/3" },
+  { value: 6, text: "1/2" },
+  { value: 8, text: "2/3" },
+  { value: 12, text: "Full" },
 ];
 
 export function computeSideBySidePreviewSpan(
@@ -221,14 +221,14 @@ export function LayoutZone({
   function confirmCreateOrJoinGroup() {
     if (!pendingGroup) return;
     const { sourceId, targetId, existingGroupId, defaultName } = pendingGroup;
-    const finalTitle = groupTitleInput.trim() || defaultName || "Widget Group";
+    const resolvedGroupName = groupTitleInput.trim() || defaultName || String("Widget Group");
     const groupId = existingGroupId || `grp-${Date.now()}`;
 
     updatePageWidgetLayout(page, (current) => {
       const nextGroups = { ...(current.groups || {}) };
       nextGroups[groupId] = {
         id: groupId,
-        title: finalTitle,
+        title: resolvedGroupName,
         collapsed: false,
       };
 
@@ -378,7 +378,7 @@ export function LayoutZone({
       }}
     >
       {editMode && (
-        <div className="skin-layout-zone-banner" role="region" aria-label={`${page} layout editor controls`}>
+        <div className="skin-layout-zone-banner" role="region" aria-label={`${page} layout editor controls`} data-no-translate>
           <div className="skin-layout-zone-banner-info">
             <Columns size={16} aria-hidden="true" />
             <strong>Layout Edit Mode: {page}</strong>
@@ -419,7 +419,7 @@ export function LayoutZone({
       )}
 
       {activeGroupsList.length > 0 && editMode && (
-        <div className="skin-active-groups-bar" aria-label="Active widget groups on this page">
+        <div className="skin-active-groups-bar" aria-label="Active widget groups on this page" data-no-translate>
           {activeGroupsList.map((grp) => (
             <div key={grp.id} className="skin-active-group-chip">
               <Layers size={14} aria-hidden="true" />
@@ -448,6 +448,7 @@ export function LayoutZone({
           role="dialog"
           aria-modal="true"
           aria-labelledby="skin-create-group-title"
+          data-no-translate
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPendingGroup(null);
           }}
@@ -496,7 +497,7 @@ export function LayoutZone({
         {children}
         {effectiveCrossPageRenderer &&
           extraWidgets.map((w) => (
-            <LayoutWidget key={w.id} id={w.id} title={w.title}>
+            <LayoutWidget key={w.id} id={w.id} widgetTitle={w.title}>
               {effectiveCrossPageRenderer(w)}
             </LayoutWidget>
           ))}
@@ -507,14 +508,17 @@ export function LayoutZone({
 
 export function LayoutWidget({
   id,
+  widgetTitle,
   title,
   children,
 }: {
   id: string;
-  title: string;
+  widgetTitle?: string;
+  title?: string;
   children: ReactNode;
 }) {
   const ctx = useContext(LayoutZoneContext);
+  const resolvedTitle = widgetTitle || title || id;
 
   // If no LayoutZone or completely default skin without editMode, render children transparently!
   if (!ctx || (!ctx.isCustomSkin && !ctx.editMode)) {
@@ -523,7 +527,7 @@ export function LayoutWidget({
 
   const config = ctx.widgetsById.get(id) || {
     id,
-    title,
+    title: resolvedTitle,
     span: 12 as WidgetSpan,
     hidden: false,
     collapsed: false,
@@ -544,7 +548,7 @@ export function LayoutWidget({
   const isHoverTarget = ctx.activeHover?.targetId === id && ctx.draggedId !== id;
   const hoverIntent = isHoverTarget ? ctx.activeHover?.intent : null;
   const groupInfo = config.groupId ? ctx.groupsById[config.groupId] : undefined;
-  const displayTitle = config.customTitle || config.title || title;
+  const displayTitle = config.customTitle || config.title || resolvedTitle;
   const isCrossPageExtra = Boolean(config.sourcePage && config.sourcePage !== ctx.page && !ctx.page.startsWith("custom:"));
 
   // Convert fractional previewOrderOffset (-0.5 / +0.5) into integer CSS order by multiplying baseOrder by 10
@@ -602,7 +606,7 @@ export function LayoutWidget({
       }}
     >
       {groupInfo && (
-        <div className="skin-widget-group-badge">
+        <div className="skin-widget-group-badge" data-no-translate>
           <Layers size={13} aria-hidden="true" />
           <strong>{groupInfo.title}</strong>
           {ctx.editMode && (
@@ -618,7 +622,7 @@ export function LayoutWidget({
       )}
 
       {ctx.editMode && isHoverTarget && (
-        <div className={`skin-drop-intent-indicator intent-${hoverIntent}`} aria-live="polite">
+        <div className={`skin-drop-intent-indicator intent-${hoverIntent}`} aria-live="polite" data-no-translate>
           {hoverIntent === "side-left" && (
             <span>⇤ Dock Side-by-Side (Left of {displayTitle}) — Both auto-fit to 1/2 width</span>
           )}
@@ -634,7 +638,7 @@ export function LayoutWidget({
       )}
 
       {ctx.editMode && (
-        <div className="skin-widget-toolbar" aria-label={`${displayTitle} layout controls`}>
+        <div className="skin-widget-toolbar" aria-label={`${displayTitle} layout controls`} data-no-translate>
           <div className="skin-widget-toolbar-title">
             <GripVertical size={15} className="skin-widget-drag-handle" aria-hidden="true" />
             <strong>{displayTitle}</strong>
@@ -648,9 +652,9 @@ export function LayoutWidget({
                   type="button"
                   className={config.span === opt.value ? "active" : ""}
                   onClick={() => ctx.setWidgetSpan(id, opt.value)}
-                  title={`Set width to ${opt.label}`}
+                  title={`Set width to ${opt.text}`}
                 >
-                  {opt.label}
+                  {opt.text}
                 </button>
               ))}
             </div>
@@ -704,7 +708,7 @@ export function LayoutWidget({
         </div>
       )}
       {!ctx.editMode && config.collapsed ? (
-        <div className="panel skin-widget-collapsed-bar">
+        <div className="panel skin-widget-collapsed-bar" data-no-translate>
           <strong>{displayTitle}</strong>
           <button type="button" onClick={() => ctx.toggleWidgetCollapsed(id)}>
             <ChevronRight size={14} /> Expand Section

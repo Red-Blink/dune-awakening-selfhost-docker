@@ -714,7 +714,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
 
   return <LayoutZone page="Admin Tools" className="panel admin-tools-panel">
     <h2 className="wide">Admin Tools</h2>
-    <LayoutWidget id="admin.liveTools" title="Global Live Tools (Broadcast, MOTD, Chat)">
+    <LayoutWidget id="admin.liveTools" widgetTitle="Global Live Tools (Broadcast, MOTD, Chat)">
     <div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Global Live Tools</span></button>
       {liveToolsOpen && <div className="playerAdmin_toggleBody"><div className="global-live-tools">
@@ -793,7 +793,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
       </div></div>}
     </div>
     </LayoutWidget>
-    <LayoutWidget id="admin.schedule" title="Schedule Server Restart & Queue">
+    <LayoutWidget id="admin.schedule" widgetTitle="Schedule Server Restart & Queue">
     <div className={`playerAdmin_toggle ${scheduleOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={scheduleOpen ? "Collapse Schedule Server Restart" : "Expand Schedule Server Restart"} onClick={() => setScheduleOpen(!scheduleOpen)}>{scheduleOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Schedule Server Restart</span></button>
       {scheduleOpen && <div className="playerAdmin_toggleBody">
@@ -898,7 +898,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
       </div>}
     </div>
     </LayoutWidget>
-    <LayoutWidget id="admin.transfer" title="Character Transfer Settings">
+    <LayoutWidget id="admin.transfer" widgetTitle="Character Transfer Settings">
     <div className={`playerAdmin_toggle ${transferOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={transferOpen ? "Collapse Character Transfer Settings" : "Expand Character Transfer Settings"} onClick={() => setTransferOpen(!transferOpen)}>{transferOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Character Transfer Settings</span></button>
       {transferOpen && <div className="playerAdmin_toggleBody">
@@ -928,7 +928,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
       </div>}
     </div>
     </LayoutWidget>
-    <LayoutWidget id="admin.history" title="Admin Command History">
+    <LayoutWidget id="admin.history" widgetTitle="Admin Command History">
     <div className={`playerAdmin_toggle admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={historyOpen ? "Collapse Command History" : "Expand Command History"} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Command History</span></button>
       {historyOpen && <div className="playerAdmin_toggleBody"><div className="admin-history-content">

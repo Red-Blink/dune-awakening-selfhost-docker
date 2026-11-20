@@ -660,7 +660,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       {/* Hidden, not unmounted, so half-typed edits on the other tab survive a switch. */}
       <div className="backups-tab-group" hidden={backupsView !== "funcom"}>
       <LayoutZone page="Backups" className="backups-widget-zone">
-      <LayoutWidget id="backups.main" title="Backup Archives & Restore">
+      <LayoutWidget id="backups.main" widgetTitle="Backup Archives & Restore">
       <section className="action-section backup-funcom-backups">
         <div className="panel-title backup-group-title"><h4>Funcom Backups</h4></div>
         <p className="backup-group-note">A snapshot of the game database only &mdash; characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.</p>
@@ -704,7 +704,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
       </section>
       </LayoutWidget>
-      <LayoutWidget id="backups.import" title="Import External Backup">
+      <LayoutWidget id="backups.import" widgetTitle="Import External Backup">
       <section className="action-section backup-external-import">
         <div className="panel-title"><h4>Import Funcom External Backup</h4></div>
         <div className="action-line backup-import-controls">
@@ -719,7 +719,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         </div>
       </section>
       </LayoutWidget>
-      <LayoutWidget id="backups.schedule" title="Automatic Backup Schedule">
+      <LayoutWidget id="backups.schedule" widgetTitle="Automatic Backup Schedule">
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[

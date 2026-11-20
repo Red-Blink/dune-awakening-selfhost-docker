@@ -20,6 +20,7 @@ export function SkinStudioLauncher({ onOpen }: { onOpen?: () => void }) {
         aria-label="Skin & Layout Studio"
         aria-haspopup="dialog"
         aria-expanded={open}
+        data-no-translate
         onClick={() => {
           setOpen(true);
           onOpen?.();
@@ -32,6 +33,7 @@ export function SkinStudioLauncher({ onOpen }: { onOpen?: () => void }) {
           className="community-button skin-exit-edit-pill"
           type="button"
           title="Exit Interactive Layout Mode"
+          data-no-translate
           onClick={() => setEditMode(false)}
         >
           <Columns size={16} aria-hidden="true" />
@@ -39,7 +41,7 @@ export function SkinStudioLauncher({ onOpen }: { onOpen?: () => void }) {
         </button>
       )}
       {open && (
-        <div className="theme-launcher-status">
+        <div className="theme-launcher-status" data-no-translate>
           <LazyTabBoundary label="Loading Skin Studio" onDismiss={() => setOpen(false)}>
             <SkinStudioModal onClose={() => setOpen(false)} />
           </LazyTabBoundary>

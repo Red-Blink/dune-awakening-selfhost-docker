@@ -49,7 +49,7 @@ export function CustomDashboardView({
   }
 
   return (
-    <div className="skin-custom-dashboard-page">
+    <div className="skin-custom-dashboard-page" data-no-translate>
       <div className="panel skin-custom-dashboard-toolbar">
         <div className="skin-custom-dashboard-toolbar-title">
           <LayoutDashboard size={18} aria-hidden="true" />

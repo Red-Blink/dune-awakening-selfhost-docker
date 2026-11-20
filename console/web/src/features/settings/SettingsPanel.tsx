@@ -270,7 +270,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
     {serverListingVisible && serverListingEnabled && publicDirectory.probeError &&
       <p className="error settings-server-listing-error">Server listing issue: {publicDirectory.probeError}</p>}
     <LayoutZone page="Settings" className="settings-section-stack">
-      <LayoutWidget id="settings.publicProfile" title="Public Listing Profile">
+      <LayoutWidget id="settings.publicProfile" widgetTitle="Public Listing Profile">
         {serverListingVisible && <div className={`playerAdmin_toggle settings-public-profile-toggle ${publicProfileOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={publicProfileOpen ? "Collapse Public Listing Profile" : "Expand Public Listing Profile"} onClick={() => setPublicProfileOpen(!publicProfileOpen)}>
             {publicProfileOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -302,7 +302,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
           </div>}
         </div>}
       </LayoutWidget>
-      <LayoutWidget id="settings.serverStartup" title="Server Startup">
+      <LayoutWidget id="settings.serverStartup" widgetTitle="Server Startup">
         <div className={`playerAdmin_toggle settings-server-startup-toggle ${serverStartupOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={serverStartupOpen ? "Collapse Server Startup" : "Expand Server Startup"} onClick={() => setServerStartupOpen(!serverStartupOpen)}>
             {serverStartupOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -330,14 +330,14 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
           </div>}
         </div>
       </LayoutWidget>
-      <LayoutWidget id="settings.runtime" title="Runtime Configuration & Files">
+      <LayoutWidget id="settings.runtime" widgetTitle="Runtime Configuration & Files">
         <RuntimeSettingsSummary settings={settings} />
       </LayoutWidget>
-      <LayoutWidget id="settings.access" title="Console Access & Experimental Features">
+      <LayoutWidget id="settings.access" widgetTitle="Console Access & Experimental Features">
         <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
         <ExperimentalFeatures confirmAction={confirmAction} />
       </LayoutWidget>
-      <LayoutWidget id="settings.webPort" title="Web Console Port">
+      <LayoutWidget id="settings.webPort" widgetTitle="Web Console Port">
         <div className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>
           {webPortOpen && <div className="playerAdmin_toggleBody">
@@ -356,7 +356,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
           </div>}
         </div>
       </LayoutWidget>
-      <LayoutWidget id="settings.password" title="Login Password">
+      <LayoutWidget id="settings.password" widgetTitle="Login Password">
         <div className={`playerAdmin_toggle settings-login-password-toggle ${loginPasswordOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={loginPasswordOpen ? "Collapse Login Password" : "Expand Login Password"} onClick={() => setLoginPasswordOpen(!loginPasswordOpen)}>{loginPasswordOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Login Password</span></button>
           {loginPasswordOpen && <div className="playerAdmin_toggleBody">
@@ -383,13 +383,13 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
           </div>}
         </div>
       </LayoutWidget>
-      <LayoutWidget id="settings.encryptedApi" title="Encrypted API Access">
+      <LayoutWidget id="settings.encryptedApi" widgetTitle="Encrypted API Access">
         <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
           {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
         </div>
       </LayoutWidget>
-      <LayoutWidget id="settings.apiKeys" title="API Keys">
+      <LayoutWidget id="settings.apiKeys" widgetTitle="API Keys">
         <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>
           {apiKeysOpen && <div className="playerAdmin_toggleBody"><ApiKeysSection confirmAction={confirmAction} /></div>}

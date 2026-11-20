@@ -587,7 +587,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
           jumps h1 -> h3 and this region has no accessible name. Each block's
           h3 (Battlegroup Status, Readiness & Health, Performance) sits under it. */}
       <h2 id="home-overview-heading" className="sr-only">Server Overview</h2>
-      <LayoutWidget id="home.hero" title="Battlegroup Status & Actions">
+      <LayoutWidget id="home.hero" widgetTitle="Battlegroup Status & Actions">
         <article className="hero-panel home-block home-status-block" aria-labelledby="home-status-heading">
           {/* An h3, not a styled span: it is the peer of the "Readiness &
               Health" and "Performance" headings, so matching them by using
@@ -645,13 +645,13 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
           {localError && <p className="error">{localError}</p>}
         </article>
       </LayoutWidget>
-      <LayoutWidget id="home.highlights" title="Feature Highlights">
+      <LayoutWidget id="home.highlights" widgetTitle="Feature Highlights">
         <HomeHighlights />
       </LayoutWidget>
-      <LayoutWidget id="home.subsystems" title="Readiness & Health">
+      <LayoutWidget id="home.subsystems" widgetTitle="Readiness & Health">
         <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness, funcomTokenAuthFailure)} onNavigate={onNavigate} />
       </LayoutWidget>
-      <LayoutWidget id="home.performance" title="Host Performance">
+      <LayoutWidget id="home.performance" widgetTitle="Host Performance">
         <HomePerformance performance={performance} error={performanceError} />
       </LayoutWidget>
     </LayoutZone>
@@ -1437,7 +1437,7 @@ export function ServerPanel(props: {
   return (
     <LayoutZone page="Server Control" className="panel server-control-panel">
       <h2 className="wide">Server Controls</h2>
-      <LayoutWidget id="server.config" title="Server Configurations">
+      <LayoutWidget id="server.config" widgetTitle="Server Configurations">
         <section className="action-section server-title-section">
           <h4>Server Configurations</h4>
           <div className="action-line title-action-line">
@@ -1454,7 +1454,7 @@ export function ServerPanel(props: {
           </div>
         </section>
       </LayoutWidget>
-      <LayoutWidget id="server.lifecycle" title="Battlegroup & Service Controls">
+      <LayoutWidget id="server.lifecycle" widgetTitle="Battlegroup & Service Controls">
         <div className="action-row">
           <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
           <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
@@ -1473,16 +1473,16 @@ export function ServerPanel(props: {
           </span>}
         </div>
       </LayoutWidget>
-      <LayoutWidget id="server.history" title="Restart History">
+      <LayoutWidget id="server.history" widgetTitle="Restart History">
         <RestartHistoryPanel refreshKey={`${taskResult?.status || ""}:${serviceRestartResult?.status || ""}`} />
       </LayoutWidget>
-      <LayoutWidget id="server.readiness" title="Readiness Timeline">
+      <LayoutWidget id="server.readiness" widgetTitle="Readiness Timeline">
         <ReadinessTimeline text={props.readiness} statusText={props.status} />
       </LayoutWidget>
-      <LayoutWidget id="server.ports" title="Port Checklist">
+      <LayoutWidget id="server.ports" widgetTitle="Port Checklist">
         <PortChecklist text={props.ports} statusText={props.status} />
       </LayoutWidget>
-      <LayoutWidget id="server.token" title="Change Funcom Token">
+      <LayoutWidget id="server.token" widgetTitle="Change Funcom Token">
         <section className="action-section">
           <div className="panel-title"><h4>Change Funcom Token</h4></div>
           <div className="action-line funcom-token-action-line">
@@ -1495,7 +1495,7 @@ export function ServerPanel(props: {
           </div>
         </section>
       </LayoutWidget>
-      <LayoutWidget id="server.doctor" title="Doctor Diagnostics & Storage Cleanup">
+      <LayoutWidget id="server.doctor" widgetTitle="Doctor Diagnostics & Storage Cleanup">
         <DoctorSummary
           text={props.doctor}
           readiness={props.readiness}

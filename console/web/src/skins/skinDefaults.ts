@@ -47,7 +47,7 @@ export const DEFAULT_SHELL_LAYOUT: ShellLayoutConfig = {
 export const DEFAULT_NAVIGATION_GROUPS: NavGroupConfig[] = [
   {
     id: "server-operations",
-    title: "Server Operations",
+    title: String("Server Operations"),
     items: [
       { tab: "Home" },
       { tab: "Server Control" },
@@ -61,7 +61,7 @@ export const DEFAULT_NAVIGATION_GROUPS: NavGroupConfig[] = [
   },
   {
     id: "arrakis-management",
-    title: "Arrakis Management",
+    title: String("Arrakis Management"),
     items: [
       { tab: "Maps" },
       { tab: "Players" },
@@ -77,7 +77,7 @@ export const DEFAULT_NAVIGATION_GROUPS: NavGroupConfig[] = [
   },
   {
     id: "community",
-    title: "Community",
+    title: String("Community"),
     showCommunityLinks: true,
     items: [{ tab: "Addons" }],
   },
@@ -89,10 +89,10 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "home.hero", title: "Battlegroup Status & Actions", span: 6, hidden: false },
-      { id: "home.highlights", title: "Feature Highlights", span: 6, hidden: false },
-      { id: "home.subsystems", title: "Readiness & Health", span: 6, hidden: false },
-      { id: "home.performance", title: "Host Performance", span: 6, hidden: false },
+      { id: "home.hero", title: String("Battlegroup Status & Actions"), span: 6, hidden: false },
+      { id: "home.highlights", title: String("Feature Highlights"), span: 6, hidden: false },
+      { id: "home.subsystems", title: String("Readiness & Health"), span: 6, hidden: false },
+      { id: "home.performance", title: String("Host Performance"), span: 6, hidden: false },
     ],
   },
   "Server Control": {
@@ -100,13 +100,13 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 14,
     widgets: [
-      { id: "server.config", title: "Server Configurations", span: 12, hidden: false },
-      { id: "server.lifecycle", title: "Battlegroup & Service Controls", span: 12, hidden: false },
-      { id: "server.history", title: "Restart History", span: 12, hidden: false },
-      { id: "server.readiness", title: "Readiness Timeline", span: 6, hidden: false },
-      { id: "server.ports", title: "Port Checklist", span: 6, hidden: false },
-      { id: "server.token", title: "Change Funcom Token", span: 12, hidden: false },
-      { id: "server.doctor", title: "Doctor Diagnostics & Storage Cleanup", span: 12, hidden: false },
+      { id: "server.config", title: String("Server Configurations"), span: 12, hidden: false },
+      { id: "server.lifecycle", title: String("Battlegroup & Service Controls"), span: 12, hidden: false },
+      { id: "server.history", title: String("Restart History"), span: 12, hidden: false },
+      { id: "server.readiness", title: String("Readiness Timeline"), span: 6, hidden: false },
+      { id: "server.ports", title: String("Port Checklist"), span: 6, hidden: false },
+      { id: "server.token", title: String("Change Funcom Token"), span: 12, hidden: false },
+      { id: "server.doctor", title: String("Doctor Diagnostics & Storage Cleanup"), span: 12, hidden: false },
     ],
   },
   Settings: {
@@ -114,14 +114,14 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "settings.publicProfile", title: "Public Listing Profile", span: 6, hidden: false },
-      { id: "settings.serverStartup", title: "Server Startup", span: 6, hidden: false },
-      { id: "settings.runtime", title: "Runtime Configuration & Files", span: 12, hidden: false },
-      { id: "settings.access", title: "Console Access & Experimental Features", span: 12, hidden: false },
-      { id: "settings.webPort", title: "Web Console Port", span: 6, hidden: false },
-      { id: "settings.password", title: "Login Password", span: 6, hidden: false },
-      { id: "settings.encryptedApi", title: "Encrypted API Access", span: 6, hidden: false },
-      { id: "settings.apiKeys", title: "API Keys", span: 6, hidden: false },
+      { id: "settings.publicProfile", title: String("Public Listing Profile"), span: 6, hidden: false },
+      { id: "settings.serverStartup", title: String("Server Startup"), span: 6, hidden: false },
+      { id: "settings.runtime", title: String("Runtime Configuration & Files"), span: 12, hidden: false },
+      { id: "settings.access", title: String("Console Access & Experimental Features"), span: 12, hidden: false },
+      { id: "settings.webPort", title: String("Web Console Port"), span: 6, hidden: false },
+      { id: "settings.password", title: String("Login Password"), span: 6, hidden: false },
+      { id: "settings.encryptedApi", title: String("Encrypted API Access"), span: 6, hidden: false },
+      { id: "settings.apiKeys", title: String("API Keys"), span: 6, hidden: false },
     ],
   },
   "Admin Tools": {
@@ -129,10 +129,10 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "admin.liveTools", title: "Global Live Tools (Broadcast, MOTD, Chat)", span: 12, hidden: false },
-      { id: "admin.schedule", title: "Schedule Server Restart & Queue", span: 12, hidden: false },
-      { id: "admin.transfer", title: "Character Transfer Settings", span: 6, hidden: false },
-      { id: "admin.history", title: "Admin Command History", span: 6, hidden: false },
+      { id: "admin.liveTools", title: String("Global Live Tools (Broadcast, MOTD, Chat)"), span: 12, hidden: false },
+      { id: "admin.schedule", title: String("Schedule Server Restart & Queue"), span: 12, hidden: false },
+      { id: "admin.transfer", title: String("Character Transfer Settings"), span: 6, hidden: false },
+      { id: "admin.history", title: String("Admin Command History"), span: 6, hidden: false },
     ],
   },
   Backups: {
@@ -140,9 +140,9 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "backups.main", title: "Backup Archives & Restore", span: 12, hidden: false },
-      { id: "backups.import", title: "Import External Backup", span: 6, hidden: false },
-      { id: "backups.schedule", title: "Automatic Backup Schedule", span: 6, hidden: false },
+      { id: "backups.main", title: String("Backup Archives & Restore"), span: 12, hidden: false },
+      { id: "backups.import", title: String("Import External Backup"), span: 6, hidden: false },
+      { id: "backups.schedule", title: String("Automatic Backup Schedule"), span: 6, hidden: false },
     ],
   },
   Database: {
@@ -150,10 +150,10 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "database.controls", title: "Database Status, Password & SSH Tunnel", span: 12, hidden: false },
-      { id: "database.tables", title: "Tables & Row Preview", span: 12, hidden: false },
-      { id: "database.search", title: "Global Column Search", span: 6, hidden: false },
-      { id: "database.sql", title: "Database Objects & SQL Console", span: 6, hidden: false },
+      { id: "database.controls", title: String("Database Status, Password & SSH Tunnel"), span: 12, hidden: false },
+      { id: "database.tables", title: String("Tables & Row Preview"), span: 12, hidden: false },
+      { id: "database.search", title: String("Global Column Search"), span: 6, hidden: false },
+      { id: "database.sql", title: String("Database Objects & SQL Console"), span: 6, hidden: false },
     ],
   },
   Players: {
@@ -161,7 +161,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.players", title: "Players Directory & Character Admin", span: 12, hidden: false, sourcePage: "Players" },
+      { id: "panel.players", title: String("Players Directory & Character Admin"), span: 12, hidden: false, sourcePage: "Players" },
     ],
   },
   Guilds: {
@@ -169,7 +169,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.guilds", title: "Guilds Management", span: 12, hidden: false, sourcePage: "Guilds" },
+      { id: "panel.guilds", title: String("Guilds Management"), span: 12, hidden: false, sourcePage: "Guilds" },
     ],
   },
   Bases: {
@@ -177,7 +177,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.bases", title: "Bases, Generators & Inventories", span: 12, hidden: false, sourcePage: "Bases" },
+      { id: "panel.bases", title: String("Bases, Generators & Inventories"), span: 12, hidden: false, sourcePage: "Bases" },
     ],
   },
   Vehicles: {
@@ -185,7 +185,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.vehicles", title: "Vehicles & Storage", span: 12, hidden: false, sourcePage: "Vehicles" },
+      { id: "panel.vehicles", title: String("Vehicles & Storage"), span: 12, hidden: false, sourcePage: "Vehicles" },
     ],
   },
   Exchange: {
@@ -193,7 +193,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.exchange", title: "CHOAM Exchange & Market Bot", span: 12, hidden: false, sourcePage: "Exchange" },
+      { id: "panel.exchange", title: String("CHOAM Exchange & Market Bot"), span: 12, hidden: false, sourcePage: "Exchange" },
     ],
   },
   Landsraad: {
@@ -201,7 +201,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.landsraad", title: "Landsraad Tasks & Milestones", span: 12, hidden: false, sourcePage: "Landsraad" },
+      { id: "panel.landsraad", title: String("Landsraad Tasks & Milestones"), span: 12, hidden: false, sourcePage: "Landsraad" },
     ],
   },
   "Live Map": {
@@ -209,7 +209,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.liveMap", title: "Interactive Live World Map", span: 12, hidden: false, sourcePage: "Live Map" },
+      { id: "panel.liveMap", title: String("Interactive Live World Map"), span: 12, hidden: false, sourcePage: "Live Map" },
     ],
   },
   Maps: {
@@ -217,7 +217,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.maps", title: "Maps, Sietches & Deep Desert Partitions", span: 12, hidden: false, sourcePage: "Maps" },
+      { id: "panel.maps", title: String("Maps, Sietches & Deep Desert Partitions"), span: 12, hidden: false, sourcePage: "Maps" },
     ],
   },
   "Care Package": {
@@ -225,7 +225,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.carePackage", title: "Care Package Delivery", span: 12, hidden: false, sourcePage: "Care Package" },
+      { id: "panel.carePackage", title: String("Care Package Delivery"), span: 12, hidden: false, sourcePage: "Care Package" },
     ],
   },
   Addons: {
@@ -233,7 +233,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.addons", title: "Community Addons", span: 12, hidden: false, sourcePage: "Addons" },
+      { id: "panel.addons", title: String("Community Addons"), span: 12, hidden: false, sourcePage: "Addons" },
     ],
   },
   Logs: {
@@ -241,7 +241,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.logs", title: "Live Service Logs", span: 12, hidden: false, sourcePage: "Logs" },
+      { id: "panel.logs", title: String("Live Service Logs"), span: 12, hidden: false, sourcePage: "Logs" },
     ],
   },
   Chat: {
@@ -249,7 +249,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.chat", title: "In-Game Chat Monitor", span: 12, hidden: false, sourcePage: "Chat" },
+      { id: "panel.chat", title: String("In-Game Chat Monitor"), span: 12, hidden: false, sourcePage: "Chat" },
     ],
   },
   Updates: {
@@ -257,7 +257,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
     columns: 12,
     gap: 16,
     widgets: [
-      { id: "panel.updates", title: "Stack & Game Server Updates", span: 12, hidden: false, sourcePage: "Updates" },
+      { id: "panel.updates", title: String("Stack & Game Server Updates"), span: 12, hidden: false, sourcePage: "Updates" },
     ],
   },
 };
@@ -285,7 +285,7 @@ export function createDefaultSkinProfile(): DuneSkinProfile {
     id: "default",
     name: "Standard Console",
     author: "RedBlink",
-    description: "The original Dune Docker Console appearance and two-column layout.",
+    description: String("The original Dune Docker Console appearance and two-column layout."),
     baseThemeId: "default",
     customColors: {
       enabled: false,
@@ -311,7 +311,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
     id: "arrakis-command-top",
     name: "Arrakis Command Deck (Top Nav)",
     author: "Dune Skin Studio",
-    description: "Wide horizontal top navigation bar, 3-column bento dashboard layout, sharp tactical corners and high-density metrics.",
+    description: String("Wide horizontal top navigation bar, 3-column bento dashboard layout, sharp tactical corners and high-density metrics."),
     baseThemeId: "dd-amber-dunes",
     customColors: {
       enabled: true,
@@ -355,10 +355,10 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
         columns: 12,
         gap: 14,
         widgets: [
-          { id: "home.hero", title: "Battlegroup Status & Actions", span: 12, hidden: false },
-          { id: "home.subsystems", title: "Readiness & Health", span: 4, hidden: false },
-          { id: "home.performance", title: "Host Performance", span: 4, hidden: false },
-          { id: "home.highlights", title: "Feature Highlights", span: 4, hidden: false },
+          { id: "home.hero", title: String("Battlegroup Status & Actions"), span: 12, hidden: false },
+          { id: "home.subsystems", title: String("Readiness & Health"), span: 4, hidden: false },
+          { id: "home.performance", title: String("Host Performance"), span: 4, hidden: false },
+          { id: "home.highlights", title: String("Feature Highlights"), span: 4, hidden: false },
         ],
       },
       "Server Control": {
@@ -366,13 +366,13 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
         columns: 12,
         gap: 14,
         widgets: [
-          { id: "server.lifecycle", title: "Battlegroup & Service Controls", span: 6, hidden: false },
-          { id: "server.config", title: "Server Configurations", span: 6, hidden: false },
-          { id: "server.readiness", title: "Readiness Timeline", span: 4, hidden: false },
-          { id: "server.ports", title: "Port Checklist", span: 4, hidden: false },
-          { id: "server.doctor", title: "Doctor Diagnostics & Storage Cleanup", span: 4, hidden: false },
-          { id: "server.history", title: "Restart History", span: 8, hidden: false },
-          { id: "server.token", title: "Change Funcom Token", span: 4, hidden: false },
+          { id: "server.lifecycle", title: String("Battlegroup & Service Controls"), span: 6, hidden: false },
+          { id: "server.config", title: String("Server Configurations"), span: 6, hidden: false },
+          { id: "server.readiness", title: String("Readiness Timeline"), span: 4, hidden: false },
+          { id: "server.ports", title: String("Port Checklist"), span: 4, hidden: false },
+          { id: "server.doctor", title: String("Doctor Diagnostics & Storage Cleanup"), span: 4, hidden: false },
+          { id: "server.history", title: String("Restart History"), span: 8, hidden: false },
+          { id: "server.token", title: String("Change Funcom Token"), span: 4, hidden: false },
         ],
       },
     },
@@ -382,7 +382,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
     id: "harkonnen-brutalist-right",
     name: "Harkonnen Industrial (Right Dock)",
     author: "Dune Skin Studio",
-    description: "Giedi Prime industrial monolith look: right-hand sidebar dock, zero border-radius, high-contrast crimson accents and monospace telemetry.",
+    description: String("Giedi Prime industrial monolith look: right-hand sidebar dock, zero border-radius, high-contrast crimson accents and monospace telemetry."),
     baseThemeId: "dune-harkonnen",
     customColors: {
       enabled: true,
@@ -422,7 +422,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
     navigation: [
       {
         id: "arrakis-management",
-        title: "01 // Sector Control",
+        title: String("01 // Sector Control"),
         items: [
           { tab: "Players" },
           { tab: "Maps" },
@@ -438,7 +438,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
       },
       {
         id: "server-operations",
-        title: "02 // Core Infrastructure",
+        title: String("02 // Core Infrastructure"),
         items: [
           { tab: "Home" },
           { tab: "Server Control" },
@@ -452,7 +452,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
       },
       {
         id: "community",
-        title: "03 // Extensions",
+        title: String("03 // Extensions"),
         showCommunityLinks: false,
         items: [{ tab: "Addons" }],
       },
@@ -464,10 +464,10 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
         columns: 12,
         gap: 12,
         widgets: [
-          { id: "home.performance", title: "Host Performance", span: 6, hidden: false },
-          { id: "home.subsystems", title: "Readiness & Health", span: 6, hidden: false },
-          { id: "home.hero", title: "Battlegroup Status & Actions", span: 12, hidden: false },
-          { id: "home.highlights", title: "Feature Highlights", span: 12, hidden: true },
+          { id: "home.performance", title: String("Host Performance"), span: 6, hidden: false },
+          { id: "home.subsystems", title: String("Readiness & Health"), span: 6, hidden: false },
+          { id: "home.hero", title: String("Battlegroup Status & Actions"), span: 12, hidden: false },
+          { id: "home.highlights", title: String("Feature Highlights"), span: 12, hidden: true },
         ],
       },
     },
@@ -477,7 +477,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
     id: "bene-gesserit-glass-rail",
     name: "Imperial Archive (Compact Icon Rail)",
     author: "Dune Skin Studio",
-    description: "Collapsible left icon rail, soft rounded glassmorphic panels, boxed 1600px reading container and serene gold/jade tones.",
+    description: String("Collapsible left icon rail, soft rounded glassmorphic panels, boxed 1600px reading container and serene gold/jade tones."),
     baseThemeId: "dune-sardaukar-imperial",
     customColors: {
       enabled: true,
@@ -520,10 +520,10 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
         columns: 12,
         gap: 20,
         widgets: [
-          { id: "home.hero", title: "Battlegroup Status & Actions", span: 8, hidden: false },
-          { id: "home.performance", title: "Host Performance", span: 4, hidden: false },
-          { id: "home.subsystems", title: "Readiness & Health", span: 6, hidden: false },
-          { id: "home.highlights", title: "Feature Highlights", span: 6, hidden: false },
+          { id: "home.hero", title: String("Battlegroup Status & Actions"), span: 8, hidden: false },
+          { id: "home.performance", title: String("Host Performance"), span: 4, hidden: false },
+          { id: "home.subsystems", title: String("Readiness & Health"), span: 6, hidden: false },
+          { id: "home.highlights", title: String("Feature Highlights"), span: 6, hidden: false },
         ],
       },
     },
@@ -533,7 +533,7 @@ export const BUILTIN_SKIN_PRESETS: DuneSkinProfile[] = [
     id: "caladan-daylight",
     name: "Caladan Daylight (Light Mode)",
     author: "Dune Skin Studio",
-    description: "High-readability daylight skin with warm alabaster surfaces, deep oceanic accents and clean modern cards.",
+    description: String("High-readability daylight skin with warm alabaster surfaces, deep oceanic accents and clean modern cards."),
     baseThemeId: "default",
     customColors: {
       enabled: true,

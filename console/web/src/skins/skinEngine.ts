@@ -170,11 +170,11 @@ function sanitizeCustomPages(raw: unknown): CustomDashboardPageConfig[] {
     seen.add(id);
     out.push({
       id,
-      title: typeof cp.title === "string" && cp.title.trim() ? cp.title.trim() : "Custom Dashboard",
+      title: typeof cp.title === "string" && cp.title.trim() ? cp.title.trim() : String("Custom Dashboard"),
       subtitle:
         typeof cp.subtitle === "string" && cp.subtitle.trim()
           ? cp.subtitle.trim()
-          : "Custom multi-module operator dashboard.",
+          : String("Custom multi-module operator dashboard."),
       groupId: typeof cp.groupId === "string" && cp.groupId.trim() ? cp.groupId.trim() : "server-operations",
       ...(cp.iconName ? { iconName: String(cp.iconName) } : {}),
     });
@@ -222,7 +222,7 @@ function reconcileNavigation(rawNav: unknown, customPages: CustomDashboardPageCo
       : [];
     groups.push({
       id: typeof g.id === "string" && g.id.trim() ? g.id.trim() : `group-${groups.length + 1}`,
-      title: typeof g.title === "string" && g.title.trim() ? g.title.trim() : "Navigation",
+      title: typeof g.title === "string" && g.title.trim() ? g.title.trim() : String("Navigation"),
       hidden: Boolean(g.hidden),
       showCommunityLinks: Boolean(g.showCommunityLinks),
       items,
@@ -258,7 +258,7 @@ function sanitizeGroupsMap(rawGroups: unknown): Record<string, WidgetGroupConfig
     if (!val || typeof val !== "object") continue;
     out[id] = {
       id,
-      title: typeof val.title === "string" && val.title.trim() ? val.title.trim() : "Widget Group",
+      title: typeof val.title === "string" && val.title.trim() ? val.title.trim() : String("Widget Group"),
       ...(val.collapsed ? { collapsed: Boolean(val.collapsed) } : {}),
     };
   }
