@@ -1183,11 +1183,11 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     playerAdmin_setTeleportFocusKey((key) => key + 1);
   }
 
-  const playerAdmin_summaryActions = <div className="summary-hero-actions">
+  const playerAdmin_summaryActions = <>
     <button type="button" onClick={playerAdmin_openTeleport}>Teleport</button>
     <button type="button" className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_kickPlayer()}>Kick Player</button>
     <InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" />
-  </div>;
+  </>;
 
   return (
     <section className="playerAdmin_container" aria-label="Player admin layout">

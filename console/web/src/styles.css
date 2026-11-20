@@ -706,11 +706,11 @@ main { padding: 22px; min-width: 0; }
 .summary-hero-text { display: grid; gap: 6px; min-width: 0; }
 .summary-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .summary-hero-actions > button { width: auto; min-height: 34px; padding: 0 14px; }
-.summary-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr); gap: 12px; align-items: start; }
-.summary-main, .summary-side { display: grid; gap: 12px; min-width: 0; align-content: start; }
-.summary-main-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
+.summary-overview { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }
+@media (max-width: 900px) { .summary-overview { grid-auto-flow: row; } }
 .summary-card { min-width: 0; padding: 13px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
-@media (max-width: 900px) { .summary-layout { grid-template-columns: minmax(0, 1fr); } }
+.summary-identity-dialog { box-sizing: border-box; max-height: calc(100dvh - 32px); overflow-y: auto; }
+.summary-identity-dialog td { overflow-wrap: anywhere; }
 .summary-hero-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .summary-hero-name { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .summary-hero-sub { display: flex; flex-wrap: wrap; gap: 18px; color: var(--muted); font-size: 13px; }
@@ -762,9 +762,6 @@ main { padding: 22px; min-width: 0; }
 .summary-meter { height: 6px; border-radius: 3px; background: var(--tint-c, rgba(214, 185, 140, .12)); overflow: hidden; }
 .summary-meter span { display: block; height: 100%; border-radius: 3px; background: var(--success); }
 .summary-meter-warn span { background: var(--warning); }
-.summary-fold { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.summary-fold-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
-.summary-fold:hover .summary-fold-toggle, .summary-fold:focus-visible .summary-fold-toggle { color: var(--text-strong); }
 .summary-mini-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
 .summary-mini-stat { display: grid; gap: 2px; align-content: start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
 .summary-mini-stat span, .summary-mini-stat small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

@@ -82,17 +82,17 @@ describe("PlayerSummary", () => {
   });
 
   describe("Guild fallback", () => {
-    it("shows an em dash when no guild is assigned on player or fallback", async () => {
+    it.each([undefined, "", "—", "Unavailable"])("omits the guild badge when detail reports %s", async (guild) => {
       const { container } = render(
         <PlayerSummary
           {...baseProps}
-          detail={{ player: { character_name: "Benny Jesserette" } }}
-          fallback={{}}
+          detail={{ player: { character_name: "Benny Jesserette", guild } }}
+          fallback={{ guild: "Cached Guild" }}
         />
       );
       await settleSummaryLoad();
       const guildMeta = container.querySelector(".summary-hero-guild");
-      expect(guildMeta?.textContent).toContain("—");
+      expect(guildMeta).toBeNull();
     });
 
     it("shows the real guild when present on the loaded player", async () => {
@@ -419,16 +419,22 @@ describe("PlayerSummary", () => {
     });
   });
 
-  describe("Identity fold", () => {
-    it("starts collapsed and shows both identity tables when opened", async () => {
-      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Benny Jesserette", fls_id: "user1" } }} fallback={{}} />);
-      const toggle = await screen.findByRole("button", { name: /Identity/ });
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
+  describe("Identity dialog", () => {
+    it("opens from the button before Teleport and restores focus on Escape", async () => {
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Benny Jesserette", fls_id: "user1" } }} fallback={{}} actions={<button>Teleport</button>} />);
+      const toggle = await screen.findByRole("button", { name: "Identity" });
+      expect(toggle.nextElementSibling).toBe(screen.getByRole("button", { name: "Teleport" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(screen.queryByText("FLS ID")).not.toBeInTheDocument();
       fireEvent.click(toggle);
-      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("dialog", { name: "Identity" })).toBeInTheDocument();
       expect(screen.getByText("Platform Identity")).toBeInTheDocument();
       expect(screen.getByText("Database Identity")).toBeInTheDocument();
+      const close = screen.getByRole("button", { name: "Close dialog" });
+      expect(close).toHaveFocus();
+      fireEvent.keyDown(close, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(toggle).toHaveFocus();
     });
   });
 
@@ -636,7 +642,7 @@ describe("PlayerSummary", () => {
       expect(runRows()).toHaveLength(5);
     });
 
-    it("drops the dungeon card and moves Vitals and Currency into the main column when there are no runs", async () => {
+    it("keeps Vitals, Currency and Faction together when there are no runs", async () => {
       vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 0, truncated: false, runs: [] });
       vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
       vi.mocked(playersApi.currency).mockResolvedValue({ capabilities: {}, rows: [{ currency_id: 1, balance: 37641, label: "Solari Credit" }] });
@@ -644,14 +650,11 @@ describe("PlayerSummary", () => {
       await waitFor(() => expect(screen.getByText("Vitals")).toBeInTheDocument());
       await waitFor(() => expect(screen.getByText("Currency")).toBeInTheDocument());
       expect(container.querySelector(".summary-dungeons")).toBeNull();
-      const pair = container.querySelector(".summary-main .summary-main-pair");
-      expect(pair).toHaveTextContent("Vitals");
-      expect(pair).toHaveTextContent("Currency");
-      expect(container.querySelector(".summary-side")).not.toHaveTextContent("Vitals");
-      expect(container.querySelector(".summary-side")).toHaveTextContent("Faction");
+      const cards = container.querySelectorAll(".summary-overview > .summary-card");
+      expect([...cards].map((card) => card.querySelector(".summary-block-label")?.textContent)).toEqual(["Vitals", "Currency", "Faction"]);
     });
 
-    it("keeps Vitals and Currency in the sidebar when the dungeon card is shown", async () => {
+    it("keeps Vitals and Faction together when the dungeon card is shown", async () => {
       vi.mocked(playersApi.dungeons).mockResolvedValue({
         capabilities: { dungeons: true }, totalRuns: 1, truncated: false,
         runs: [{ completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 1, party }]
@@ -659,8 +662,8 @@ describe("PlayerSummary", () => {
       vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
       const { container } = render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
       await waitFor(() => expect(container.querySelector(".summary-dungeons")).not.toBeNull());
-      await waitFor(() => expect(container.querySelector(".summary-side")).toHaveTextContent("Vitals"));
-      expect(container.querySelector(".summary-main-pair")).toBeNull();
+      await waitFor(() => expect(container.querySelector(".summary-overview")).toHaveTextContent("Vitals"));
+      expect(container.querySelector(".summary-overview")).toHaveTextContent("Faction");
     });
 
     it("notes truncation when only the latest runs were returned", async () => {
@@ -692,7 +695,7 @@ describe("PlayerSummary", () => {
       );
       await waitFor(() => {
         expect(screen.getByText("Health")).toBeInTheDocument();
-        expect(screen.getByText("175 / 205 (estimated max)")).toBeInTheDocument();
+        expect(screen.getByText("175 / 205 (Estimated Max)")).toBeInTheDocument();
         expect(screen.getByText("Hydration")).toBeInTheDocument();
         expect(screen.getByText("84 / 100")).toBeInTheDocument();
         expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
@@ -732,11 +735,11 @@ describe("PlayerSummary", () => {
       );
       await act(async () => { await Promise.resolve(); });
       expect(playersApi.vitals).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("175 / 205 (estimated max)")).toBeInTheDocument();
+      expect(screen.getByText("175 / 205 (Estimated Max)")).toBeInTheDocument();
 
       await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
       expect(playersApi.vitals).toHaveBeenCalledTimes(2);
-      expect(screen.getByText("140 / 205 (estimated max)")).toBeInTheDocument();
+      expect(screen.getByText("140 / 205 (Estimated Max)")).toBeInTheDocument();
       expect(screen.getByText("61 / 100")).toBeInTheDocument();
 
       unmount();

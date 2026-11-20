@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
-import { MapPin, Shield, Coins, CircleDollarSign, Banknote, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Shield, Coins, CircleDollarSign, Banknote, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { firstDefined } from "../../lib/display";
@@ -63,6 +64,15 @@ export function PlayerSummary({
   const [showAllBestTimes, setShowAllBestTimes] = useState(false);
   const [showAllDungeonRuns, setShowAllDungeonRuns] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
+  const identityButton = useRef<HTMLButtonElement>(null);
+  const identityClose = useRef<HTMLButtonElement>(null);
+  const identityTitleId = useId();
+  useEffect(() => {
+    if (!showIdentity) return;
+    const trigger = identityButton.current;
+    identityClose.current?.focus();
+    return () => trigger?.focus();
+  }, [showIdentity]);
   useEffect(() => {
     setShowAllBestTimes(false);
     setShowAllDungeonRuns(false);
@@ -142,7 +152,8 @@ export function PlayerSummary({
   const characterName = text(firstDefined(player.character_name, player.name, fallback.character_name)) || "—";
   const funcomId = text(firstDefined(player.funcom_id, fallback.funcom_id));
   const map = text(firstDefined(player.map, player.world, fallback.map)) || "—";
-  const guild = text(firstDefined(player.guild, fallback.guild)) || "—";
+  const guild = text(player.guild).trim();
+  const showGuild = Boolean(guild) && !/^(?:—|unavailable)$/i.test(guild);
   const faction = text(firstDefined(player.faction, fallback.faction)) || "Neutral";
   const flsId = text(firstDefined(player.fls_id, fallback.fls_id, actionPlayerId)) || "missing";
   const accountId = idText(firstDefined(player.account_id, fallback.account_id));
@@ -209,13 +220,12 @@ export function PlayerSummary({
   const fastestClear = bestDungeonTimes.reduce<DungeonRow | null>((top, row) => (!top || row.duration < top.duration ? row : top), null);
   const showStats = Boolean(progression) || intel !== null || Boolean(dungeonRuns);
   const showCurrency = currencyRows.length > 0 || solarisCoinTotal !== null;
-  // Without a dungeon card the main column would sit mostly empty, so Vitals and Currency move into it.
   const hasDungeonCard = Boolean(dungeonRuns && dungeonRuns.totalRuns > 0);
 
   const vitalsCard = vitals && <div className="summary-block summary-card">
     <div className="summary-block-label">Vitals</div>
     <div className="summary-vital">
-      <div className="summary-vital-row"><span>Health</span><strong>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}${vitals.maxHealthEstimated ? " (estimated max)" : ""}` : "—"}</strong></div>
+      <div className="summary-vital-row"><span>Health</span><strong>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}${vitals.maxHealthEstimated ? " (Estimated Max)" : ""}` : "—"}</strong></div>
       <VitalMeter value={vitals.currentHealth} max={vitals.maxHealth} />
     </div>
     <div className="summary-vital">
@@ -248,142 +258,150 @@ export function PlayerSummary({
         </div>
         <div className="summary-hero-sub">
           <span className="summary-hero-meta summary-hero-map"><MapPin size={14} className="summary-hero-icon" aria-label="Map" /><span>{map}</span></span>
-          <span className="summary-hero-meta summary-hero-guild"><Shield size={14} className="summary-hero-icon" aria-label="Guild" /><span>{guild}</span></span>
+          {showGuild && <span className="summary-hero-meta summary-hero-guild"><Shield size={14} className="summary-hero-icon" aria-label="Guild" /><span data-no-translate>{guild}</span></span>}
         </div>
       </div>
-      {actions}
+      <div className="summary-hero-actions">
+        <button type="button" ref={identityButton} aria-haspopup="dialog" onClick={() => setShowIdentity(true)}>Identity</button>
+        {actions}
+      </div>
     </div>
 
-    <div className="summary-layout">
-      <div className="summary-main">
-        {showStats && <div className="summary-stats">
-          {progression && <>
-            <div className="summary-stat summary-stat-level">
-              <span>Level</span>
-              <strong data-no-translate>{String(progression.level ?? 0)}</strong>
-              <small><span data-no-translate>{(progression.xp ?? 0).toLocaleString()}</span> <span>XP</span></small>
-            </div>
-            <div className="summary-stat"><span>Skill Points</span><strong>{`${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`}</strong></div>
-          </>}
-          {intel !== null && <div className="summary-stat"><span>Available Intel</span><strong>{intel.toLocaleString()}</strong></div>}
-          {dungeonRuns && <div className="summary-stat"><span>Dungeon Runs</span><strong>{dungeonRuns.totalRuns.toLocaleString()}</strong></div>}
-        </div>}
+    {showStats && <div className="summary-stats">
+      {progression && <>
+        <div className="summary-stat summary-stat-level">
+          <span>Level</span>
+          <strong data-no-translate>{String(progression.level ?? 0)}</strong>
+          <small><span data-no-translate>{(progression.xp ?? 0).toLocaleString()}</span> <span>XP</span></small>
+        </div>
+        <div className="summary-stat"><span>Skill Points</span><strong>{`${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`}</strong></div>
+      </>}
+      {intel !== null && <div className="summary-stat"><span>Available Intel</span><strong>{intel.toLocaleString()}</strong></div>}
+      {dungeonRuns && <div className="summary-stat"><span>Dungeon Runs</span><strong>{dungeonRuns.totalRuns.toLocaleString()}</strong></div>}
+    </div>}
 
-        {!hasDungeonCard && (vitalsCard || currencyCard) && <div className="summary-main-pair">
-          {vitalsCard}
-          {currencyCard}
-        </div>}
-
-        {dungeonRuns && hasDungeonCard && <div className="summary-block summary-card summary-dungeons">
-          <div className="summary-block-label">Dungeon Runs</div>
-            <div className="summary-mini-stats">
-              <div className="summary-mini-stat"><span>Dungeons</span><strong data-no-translate>{bestByDungeon.length.toLocaleString()}</strong></div>
-              {hardest && <div className="summary-mini-stat"><span>Highest Difficulty</span><strong data-no-translate>{hardest.difficulty}</strong><small data-no-translate>{hardest.dungeon}</small></div>}
-              {fastestClear && <div className="summary-mini-stat"><span>Fastest Clear</span><strong data-no-translate>{formatDungeonDuration(fastestClear.duration)}</strong><small data-no-translate>{`${fastestClear.dungeon} · ${fastestClear.difficulty}`}</small></div>}
-            </div>
-            {dungeonRuns.truncated && <p className="summary-dungeons-truncated">{`Showing the latest ${dungeonRows.length.toLocaleString()} runs.`}</p>}
-
-            <div className="summary-block-label summary-sublabel">Best Time by Difficulty</div>
-            <div className="summary-best-list">
-              {bestByDungeon.map((group) => {
-                const fastestIndex = group.entries.findIndex((row) => row.difficulty === group.fastestDifficulty);
-                const visible = showAllBestTimes ? group.entries : group.entries.filter((_, index) =>
-                  fastestIndex < BEST_TIME_CHIP_LIMIT
-                    ? index < BEST_TIME_CHIP_LIMIT
-                    : index < BEST_TIME_CHIP_LIMIT - 1 || index === fastestIndex);
-                const hidden = group.entries.length - visible.length;
-                return <div className="summary-best-row" key={group.dungeonId}>
-                  <span className="summary-best-name" title={group.dungeonId} data-no-translate>{group.dungeon}</span>
-                  <div className="summary-chips" data-no-translate>
-                    {visible.map((row) => <span
-                      key={row.difficulty}
-                      className={`summary-chip${row.difficulty === group.fastestDifficulty ? " summary-chip-best" : ""}`}
-                      title={`Difficulty ${row.difficulty}`}
-                    ><span className="summary-chip-difficulty">{row.difficulty}</span> <strong>{formatDungeonDuration(row.duration)}</strong></span>)}
-                    {hidden > 0 && <button type="button" className="summary-chip summary-chip-more" onClick={() => setShowAllBestTimes(true)}>{`+${hidden}`}</button>}
-                  </div>
-                </div>;
-              })}
-            </div>
-            {hasHiddenChips && showAllBestTimes && <button type="button" className="summary-dungeons-show-all" onClick={() => setShowAllBestTimes(false)}>Show Fewer Items</button>}
-
-            <div className="summary-block-label summary-sublabel">Recent Runs</div>
-            <DataTable
-              rows={dungeonSort.sortedRows}
-              columns={["dungeon", "difficulty", "duration", "party"]}
-              columnLabels={{ dungeon: "Dungeon", difficulty: "Difficulty", duration: "Duration", party: "Party" }}
-              sortColumn={dungeonSort.sortColumn}
-              sortDirection={dungeonSort.sortDirection}
-              onSort={dungeonSort.onSort}
-              tableClassName="summary-dungeons-table"
-              rowKey={(row) => String(row.completionId)}
-              renderCell={(row, col) =>
-                col === "dungeon" ? <span title={String(row.dungeonId)} data-no-translate>{String(row.dungeon)}</span> :
-                col === "duration" ? <span data-no-translate>{formatDungeonDuration(Number(row.duration))}</span> :
-                col === "party" ? <span data-no-translate>{`${row.party} · ${row.partyNames}`}</span> :
-                <span data-no-translate>{String(row[col])}</span>
-              }
-            />
-            {dungeonRows.length > DUNGEON_RUNS_PREVIEW_LIMIT && <button
-              type="button"
-              className="summary-dungeons-show-all"
-              onClick={() => setShowAllDungeonRuns(!showAllDungeonRuns)}
-            >{showAllDungeonRuns ? "Show Fewer Items" : `Show All ${dungeonRows.length.toLocaleString()} Items`}</button>}
-        </div>}
-      </div>
-
-      <aside className="summary-side">
-        {hasDungeonCard && vitalsCard}
-        {hasDungeonCard && currencyCard}
-
-        <div className="summary-block summary-card">
-          <div className="summary-block-label">Faction</div>
-          <table className="summary-kv"><tbody>
-            <tr><td>Alignment</td><td>{faction}</td></tr>
+    <div className="summary-overview">
+      {vitalsCard}
+      {currencyCard}
+      <div className="summary-block summary-card">
+        <div className="summary-block-label">Faction</div>
+        <table className="summary-kv"><tbody>
+          <tr><td>Alignment</td><td>{faction}</td></tr>
+        </tbody></table>
+        {factionRows !== null && <>
+          <div className="summary-block-label summary-sublabel">Faction Standings</div>
+          <table className="summary-kv summary-faction-standings"><tbody>
+            {factionRows.map((row) => <tr key={row.faction_id} aria-label={`${row.faction_name || `Faction ${row.faction_id}`} reputation`}>
+              <td>{row.faction_name || `Faction ${row.faction_id}`}</td>
+              <td><span className="summary-faction-metrics">
+                <span><strong>{Number(row.reputation_amount).toLocaleString()}</strong> Rep</span>
+                {row.estimated_rank !== undefined && <span><strong>{row.estimated_rank}</strong> Est. Rank</span>}
+                {row.rank_limited_by_progression && row.current_rank_limit !== null && row.current_rank_limit !== undefined
+                  && <span><strong>{row.current_rank_limit}</strong> Story Limit</span>}
+                {(row.reputation_in_sync === false || row.progression_repair_available) && onRepairFactionReputation && <span className="summary-faction-repair-action">
+                  <button
+                    type="button"
+                    className="summary-faction-repair-button"
+                    disabled={factionRepairDisabled || factionRepairResult?.pending}
+                    title={factionRepairDisabled ? "The player must be fully offline before their faction state can be repaired." : "Restore earned faction progression and synchronize reputation."}
+                    onClick={() => void onRepairFactionReputation()}
+                  >{factionRepairResult?.pending ? "Repairing…" : factionRepairDisabled ? "Player Must Be Offline" : "Repair Faction"}</button>
+                </span>}
+              </span></td>
+            </tr>)}
           </tbody></table>
-          {factionRows !== null && <>
-            <div className="summary-block-label summary-sublabel">Faction Standings</div>
-            <table className="summary-kv summary-faction-standings"><tbody>
-              {factionRows.map((row) => <tr key={row.faction_id} aria-label={`${row.faction_name || `Faction ${row.faction_id}`} reputation`}>
-                <td>{row.faction_name || `Faction ${row.faction_id}`}</td>
-                <td><span className="summary-faction-metrics">
-                  <span><strong>{Number(row.reputation_amount).toLocaleString()}</strong> Rep</span>
-                  {row.estimated_rank !== undefined && <span><strong>{row.estimated_rank}</strong> Est. Rank</span>}
-                  {row.rank_limited_by_progression && row.current_rank_limit !== null && row.current_rank_limit !== undefined
-                    && <span><strong>{row.current_rank_limit}</strong> Story Limit</span>}
-                  {(row.reputation_in_sync === false || row.progression_repair_available) && onRepairFactionReputation && <span className="summary-faction-repair-action">
-                    <button
-                      type="button"
-                      className="summary-faction-repair-button"
-                      disabled={factionRepairDisabled || factionRepairResult?.pending}
-                      title={factionRepairDisabled ? "The player must be fully offline before their faction state can be repaired." : "Restore earned faction progression and synchronize reputation."}
-                      onClick={() => void onRepairFactionReputation()}
-                    >{factionRepairResult?.pending ? "Repairing…" : factionRepairDisabled ? "Player Must Be Offline" : "Repair Faction"}</button>
-                  </span>}
-                </span></td>
-              </tr>)}
-            </tbody></table>
-            {factionRepairResult && <div className={`summary-faction-repair-result ${factionRepairResult.tone}${factionRepairResult.pending ? " pending" : ""}`} role="status" aria-live="polite">{factionRepairResult.text}</div>}
-          </>}
-        </div>
-
-        <div className="summary-block summary-card summary-identity">
-          <button type="button" className="summary-fold" aria-expanded={showIdentity} onClick={() => setShowIdentity(!showIdentity)}>
-            <span className="summary-block-label">Identity</span>
-            <span className="summary-fold-toggle">{showIdentity ? "Hide" : "Show"}{showIdentity ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}</span>
-          </button>
-          {showIdentity && <>
-            <div className="summary-block-label summary-sublabel">Platform Identity</div>
-            <table className="summary-kv"><tbody>
-              {identityRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
-            </tbody></table>
-            <div className="summary-block-label summary-sublabel">Database Identity</div>
-            <table className="summary-kv"><tbody>
-              {databaseIdRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
-            </tbody></table>
-          </>}
-        </div>
-      </aside>
+          {factionRepairResult && <div className={`summary-faction-repair-result ${factionRepairResult.tone}${factionRepairResult.pending ? " pending" : ""}`} role="status" aria-live="polite">{factionRepairResult.text}</div>}
+        </>}
+      </div>
     </div>
+
+    {dungeonRuns && hasDungeonCard && <div className="summary-block summary-card summary-dungeons">
+      <div className="summary-block-label">Dungeon Runs</div>
+        <div className="summary-mini-stats">
+          <div className="summary-mini-stat"><span>Dungeons</span><strong data-no-translate>{bestByDungeon.length.toLocaleString()}</strong></div>
+          {hardest && <div className="summary-mini-stat"><span>Highest Difficulty</span><strong data-no-translate>{hardest.difficulty}</strong><small data-no-translate>{hardest.dungeon}</small></div>}
+          {fastestClear && <div className="summary-mini-stat"><span>Fastest Clear</span><strong data-no-translate>{formatDungeonDuration(fastestClear.duration)}</strong><small data-no-translate>{`${fastestClear.dungeon} · ${fastestClear.difficulty}`}</small></div>}
+        </div>
+        {dungeonRuns.truncated && <p className="summary-dungeons-truncated">{`Showing the latest ${dungeonRows.length.toLocaleString()} runs.`}</p>}
+
+        <div className="summary-block-label summary-sublabel">Best Time by Difficulty</div>
+        <div className="summary-best-list">
+          {bestByDungeon.map((group) => {
+            const fastestIndex = group.entries.findIndex((row) => row.difficulty === group.fastestDifficulty);
+            const visible = showAllBestTimes ? group.entries : group.entries.filter((_, index) =>
+              fastestIndex < BEST_TIME_CHIP_LIMIT
+                ? index < BEST_TIME_CHIP_LIMIT
+                : index < BEST_TIME_CHIP_LIMIT - 1 || index === fastestIndex);
+            const hidden = group.entries.length - visible.length;
+            return <div className="summary-best-row" key={group.dungeonId}>
+              <span className="summary-best-name" title={group.dungeonId} data-no-translate>{group.dungeon}</span>
+              <div className="summary-chips" data-no-translate>
+                {visible.map((row) => <span
+                  key={row.difficulty}
+                  className={`summary-chip${row.difficulty === group.fastestDifficulty ? " summary-chip-best" : ""}`}
+                  title={`Difficulty ${row.difficulty}`}
+                ><span className="summary-chip-difficulty">{row.difficulty}</span> <strong>{formatDungeonDuration(row.duration)}</strong></span>)}
+                {hidden > 0 && <button type="button" className="summary-chip summary-chip-more" onClick={() => setShowAllBestTimes(true)}>{`+${hidden}`}</button>}
+              </div>
+            </div>;
+          })}
+        </div>
+        {hasHiddenChips && showAllBestTimes && <button type="button" className="summary-dungeons-show-all" onClick={() => setShowAllBestTimes(false)}>Show Fewer Items</button>}
+
+        <div className="summary-block-label summary-sublabel">Recent Runs</div>
+        <DataTable
+          rows={dungeonSort.sortedRows}
+          columns={["dungeon", "difficulty", "duration", "party"]}
+          columnLabels={{ dungeon: "Dungeon", difficulty: "Difficulty", duration: "Duration", party: "Party" }}
+          sortColumn={dungeonSort.sortColumn}
+          sortDirection={dungeonSort.sortDirection}
+          onSort={dungeonSort.onSort}
+          tableClassName="summary-dungeons-table"
+          rowKey={(row) => String(row.completionId)}
+          renderCell={(row, col) =>
+            col === "dungeon" ? <span title={String(row.dungeonId)} data-no-translate>{String(row.dungeon)}</span> :
+            col === "duration" ? <span data-no-translate>{formatDungeonDuration(Number(row.duration))}</span> :
+            col === "party" ? <span data-no-translate>{`${row.party} · ${row.partyNames}`}</span> :
+            <span data-no-translate>{String(row[col])}</span>
+          }
+        />
+        {dungeonRows.length > DUNGEON_RUNS_PREVIEW_LIMIT && <button
+          type="button"
+          className="summary-dungeons-show-all"
+          onClick={() => setShowAllDungeonRuns(!showAllDungeonRuns)}
+        >{showAllDungeonRuns ? "Show Fewer Items" : `Show All ${dungeonRows.length.toLocaleString()} Items`}</button>}
+    </div>}
+    {showIdentity && createPortal(
+      <div className="modal-overlay" onMouseDown={(event) => {
+        if (event.target === event.currentTarget) setShowIdentity(false);
+      }}>
+        <section className="confirm-modal summary-identity-dialog" role="dialog" aria-modal="true" aria-labelledby={identityTitleId}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              setShowIdentity(false);
+            }
+            if (event.key === "Tab") event.preventDefault();
+          }}>
+          <div className="confirm-modal-title">
+            <h3 id={identityTitleId}>Identity</h3>
+            <button type="button" ref={identityClose} className="icon-action" aria-label="Close dialog" onClick={() => setShowIdentity(false)}><X size={18} /></button>
+          </div>
+          <div className="summary-block">
+            <div className="summary-block-label">Platform Identity</div>
+            <table className="summary-kv"><tbody>
+              {identityRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono" data-no-translate>{row.value}</td></tr>)}
+            </tbody></table>
+          </div>
+          <div className="summary-block">
+            <div className="summary-block-label">Database Identity</div>
+            <table className="summary-kv"><tbody>
+              {databaseIdRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono" data-no-translate>{row.value}</td></tr>)}
+            </tbody></table>
+          </div>
+        </section>
+      </div>,
+      document.body
+    )}
   </section>;
 }

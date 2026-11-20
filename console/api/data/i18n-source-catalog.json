@@ -5313,7 +5313,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 164,
+        "line": 175,
         "nearby": [
           "FLS ID",
           "DB Player",
@@ -6561,9 +6561,9 @@
     "Alignment": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 342,
+        "line": 289,
         "nearby": [
-          "Show All {count0} Items",
+          "Dungeon Runs",
           "Faction",
           "Faction Standings",
           "Rep"
@@ -8509,11 +8509,12 @@
     "Available Intel": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 268,
+        "line": 279,
         "nearby": [
           "XP",
           "Skill Points",
-          "Dungeon Runs"
+          "Dungeon Runs",
+          "Faction"
         ]
       }
     ],
@@ -9784,7 +9785,7 @@
     "Best Time by Difficulty": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 286,
+        "line": 327,
         "nearby": [
           "Fastest Clear",
           "Showing the latest {count0} runs.",
@@ -13080,6 +13081,16 @@
           "Choose how to download",
           "Blueprint"
         ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 388,
+        "nearby": [
+          "Show All {count0} Items",
+          "Identity",
+          "Platform Identity",
+          "Database Identity"
+        ]
       }
     ],
     "Close JSON editor": [
@@ -15362,7 +15373,7 @@
     "Currency": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 232,
+        "line": 242,
         "nearby": [
           "Hydration",
           "Spice Addiction",
@@ -15896,9 +15907,9 @@
     "Database Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 380,
+        "line": 397,
         "nearby": [
-          "Show",
+          "Close dialog",
           "Platform Identity"
         ]
       }
@@ -16085,7 +16096,7 @@
     "DB Player": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 163,
+        "line": 174,
         "nearby": [
           "Funcom ID",
           "FLS ID",
@@ -19045,18 +19056,20 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 269,
+        "line": 280,
         "nearby": [
           "Skill Points",
           "Available Intel",
-          "Dungeons"
+          "Faction",
+          "Alignment"
         ]
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 278,
+        "line": 319,
         "nearby": [
-          "Available Intel",
+          "Player Must Be Offline",
+          "Repair Faction",
           "Dungeons",
           "Highest Difficulty"
         ]
@@ -19111,8 +19124,9 @@
     "Dungeons": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 280,
+        "line": 321,
         "nearby": [
+          "Repair Faction",
           "Dungeon Runs",
           "Highest Difficulty",
           "Fastest Clear"
@@ -20220,7 +20234,7 @@
     "Est. Rank": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 351,
+        "line": 298,
         "nearby": [
           "Faction Standings",
           "Rep",
@@ -21034,10 +21048,10 @@
     "Faction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 340,
+        "line": 287,
         "nearby": [
-          "Show Fewer Items",
-          "Show All {count0} Items",
+          "Available Intel",
+          "Dungeon Runs",
           "Alignment",
           "Faction Standings"
         ]
@@ -21080,7 +21094,7 @@
     "Faction Standings": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 345,
+        "line": 292,
         "nearby": [
           "Faction",
           "Alignment",
@@ -21231,7 +21245,7 @@
     "Fastest Clear": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 282,
+        "line": 323,
         "nearby": [
           "Dungeons",
           "Highest Difficulty",
@@ -22223,7 +22237,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 160,
+        "line": 171,
         "nearby": [
           "Platform ID",
           "Funcom ID",
@@ -22565,7 +22579,7 @@
     "Funcom ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 159,
+        "line": 170,
         "nearby": [
           "Platform ID",
           "FLS ID",
@@ -24105,12 +24119,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 251,
+        "line": 261,
         "nearby": [
           "Currency",
           "Map",
-          "Level",
-          "XP"
+          "Identity",
+          "Level"
         ]
       },
       {
@@ -24230,7 +24244,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 218,
+        "line": 228,
         "nearby": [
           "Solari Coin",
           "Vitals",
@@ -24285,18 +24299,6 @@
         ]
       }
     ],
-    "Hide": [
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 373,
-        "nearby": [
-          "Repair Faction",
-          "Identity",
-          "Show",
-          "Platform Identity"
-        ]
-      }
-    ],
     "Hide Inactive Players After": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
@@ -24312,7 +24314,7 @@
     "Highest Difficulty": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 281,
+        "line": 322,
         "nearby": [
           "Dungeon Runs",
           "Dungeons",
@@ -24618,7 +24620,7 @@
     "Hydration": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 222,
+        "line": 232,
         "nearby": [
           "Vitals",
           "Health",
@@ -24642,12 +24644,22 @@
     "Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 372,
+        "line": 265,
         "nearby": [
-          "Player Must Be Offline",
-          "Repair Faction",
-          "Hide",
-          "Show"
+          "Map",
+          "Guild",
+          "Level",
+          "XP"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 387,
+        "nearby": [
+          "Show Fewer Items",
+          "Show All {count0} Items",
+          "Close dialog",
+          "Platform Identity"
         ]
       }
     ],
@@ -27289,6 +27301,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 273,
+        "nearby": [
+          "Guild",
+          "Identity",
+          "XP",
+          "Skill Points"
+        ]
+      },
+      {
         "file": "console/web/src/features/players/SpecializationTab.tsx",
         "line": 360,
         "nearby": [
@@ -27296,16 +27318,6 @@
           "XP",
           "Keystone",
           "Add XP"
-        ]
-      },
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 262,
-        "nearby": [
-          "Map",
-          "Guild",
-          "XP",
-          "Skill Points"
         ]
       }
     ],
@@ -29083,12 +29095,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 250,
+        "line": 260,
         "nearby": [
           "Spice Addiction",
           "Currency",
           "Guild",
-          "Level"
+          "Identity"
         ]
       }
     ],
@@ -35551,7 +35563,7 @@
     "Platform ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 154,
+        "line": 165,
         "nearby": [
           "Funcom ID",
           "FLS ID"
@@ -35561,10 +35573,10 @@
     "Platform Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 376,
+        "line": 391,
         "nearby": [
-          "Hide",
-          "Show",
+          "Identity",
+          "Close dialog",
           "Database Identity"
         ]
       }
@@ -35786,7 +35798,7 @@
     "Player Controller": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 165,
+        "line": 176,
         "nearby": [
           "DB Player",
           "Account",
@@ -35833,12 +35845,12 @@
     "Player Must Be Offline": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 361,
+        "line": 308,
         "nearby": [
           "Restore earned faction progression and synchronize reputation.",
           "Repairing…",
           "Repair Faction",
-          "Identity"
+          "Dungeon Runs"
         ]
       }
     ],
@@ -35899,7 +35911,7 @@
     "Player State": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 166,
+        "line": 177,
         "nearby": [
           "Account",
           "Player Controller",
@@ -38109,7 +38121,7 @@
     "Recent Runs": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 310,
+        "line": 351,
         "nearby": [
           "Best Time by Difficulty",
           "Show Fewer Items",
@@ -39733,7 +39745,7 @@
     "Rep": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 350,
+        "line": 297,
         "nearby": [
           "Alignment",
           "Faction Standings",
@@ -39779,12 +39791,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 361,
+        "line": 308,
         "nearby": [
           "Repairing…",
           "Player Must Be Offline",
-          "Identity",
-          "Hide"
+          "Dungeon Runs",
+          "Dungeons"
         ]
       }
     ],
@@ -39958,7 +39970,7 @@
     "Repairing…": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 361,
+        "line": 308,
         "nearby": [
           "The player must be fully offline before their faction state can be repaired.",
           "Restore earned faction progression and synchronize reputation.",
@@ -41550,7 +41562,7 @@
     "Restore earned faction progression and synchronize reputation.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 359,
+        "line": 306,
         "nearby": [
           "Story Limit",
           "The player must be fully offline before their faction state can be repaired.",
@@ -46567,16 +46579,6 @@
           "Recent Kills Rows",
           "All"
         ]
-      },
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 373,
-        "nearby": [
-          "Identity",
-          "Hide",
-          "Platform Identity",
-          "Database Identity"
-        ]
       }
     ],
     "Show all {count0} items": [
@@ -46594,12 +46596,12 @@
     "Show All {count0} Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 331,
+        "line": 372,
         "nearby": [
           "Recent Runs",
           "Show Fewer Items",
-          "Faction",
-          "Alignment"
+          "Identity",
+          "Close dialog"
         ]
       }
     ],
@@ -46662,7 +46664,7 @@
     "Show Fewer Items": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 308,
+        "line": 349,
         "nearby": [
           "Showing the latest {count0} runs.",
           "Best Time by Difficulty",
@@ -46671,11 +46673,11 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 331,
+        "line": 372,
         "nearby": [
           "Recent Runs",
           "Show All {count0} Items",
-          "Faction"
+          "Identity"
         ]
       }
     ],
@@ -46863,7 +46865,7 @@
     "Showing the latest {count0} runs.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 284,
+        "line": 325,
         "nearby": [
           "Highest Difficulty",
           "Fastest Clear",
@@ -47261,7 +47263,7 @@
     "Skill Points": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 266,
+        "line": 277,
         "nearby": [
           "Level",
           "XP",
@@ -47463,7 +47465,7 @@
     "Solari Coin": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 173,
+        "line": 184,
         "nearby": [
           "Player State",
           "Solari Credit",
@@ -47485,7 +47487,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 172,
+        "line": 183,
         "nearby": [
           "Player Controller",
           "Player State",
@@ -47691,7 +47693,7 @@
     "Spice Addiction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 226,
+        "line": 236,
         "nearby": [
           "Health",
           "Hydration",
@@ -48598,7 +48600,7 @@
     "Story Limit": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 353,
+        "line": 300,
         "nearby": [
           "Rep",
           "Est. Rank",
@@ -50607,7 +50609,7 @@
     "The player must be fully offline before their faction state can be repaired.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 359,
+        "line": 306,
         "nearby": [
           "Est. Rank",
           "Story Limit",
@@ -54665,7 +54667,7 @@
     "Vitals": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 216,
+        "line": 226,
         "nearby": [
           "Solari Credit",
           "Solari Coin",
@@ -55503,6 +55505,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 275,
+        "nearby": [
+          "Identity",
+          "Level",
+          "Skill Points",
+          "Available Intel"
+        ]
+      },
+      {
         "file": "console/web/src/features/players/SpecializationTab.tsx",
         "line": 359,
         "nearby": [
@@ -55510,16 +55522,6 @@
           "Track",
           "Level",
           "Keystone"
-        ]
-      },
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 264,
-        "nearby": [
-          "Guild",
-          "Level",
-          "Skill Points",
-          "Available Intel"
         ]
       }
     ],
