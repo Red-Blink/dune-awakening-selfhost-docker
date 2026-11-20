@@ -12,6 +12,7 @@ import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDis
 import { gameAssetsMissingInText } from "../updates/updateUtils";
 import { SystemBackupScheduleCard } from "./SystemBackupScheduleCard";
 import { SegmentedControl, type SegmentOption } from "../../components/common/SegmentedControl";
+import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 
 type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention"; action?: { label: string; onClick: () => void } };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
@@ -658,6 +659,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
       {/* Hidden, not unmounted, so half-typed edits on the other tab survive a switch. */}
       <div className="backups-tab-group" hidden={backupsView !== "funcom"}>
+      <LayoutZone page="Backups" className="backups-widget-zone">
+      <LayoutWidget id="backups.main" title="Backup Archives & Restore">
       <section className="action-section backup-funcom-backups">
         <div className="panel-title backup-group-title"><h4>Funcom Backups</h4></div>
         <p className="backup-group-note">A snapshot of the game database only &mdash; characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.</p>
@@ -700,6 +703,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
         </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
       </section>
+      </LayoutWidget>
+      <LayoutWidget id="backups.import" title="Import External Backup">
       <section className="action-section backup-external-import">
         <div className="panel-title"><h4>Import Funcom External Backup</h4></div>
         <div className="action-line backup-import-controls">
@@ -713,6 +718,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           </div>
         </div>
       </section>
+      </LayoutWidget>
+      <LayoutWidget id="backups.schedule" title="Automatic Backup Schedule">
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
@@ -735,6 +742,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           </span>}
         </div>
       </section>
+      </LayoutWidget>
+      </LayoutZone>
       </div>
       <div className="backups-tab-group" hidden={backupsView !== "system"}>
       <section className="action-section backup-system-backups">

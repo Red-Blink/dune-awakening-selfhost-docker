@@ -8,6 +8,7 @@ import { serverApi } from "../../api/server";
 import type { RestartMessages, RestartQueueResponse } from "../../api/server";
 import { RestartMessagesModal } from "./RestartMessagesModal";
 import { ScheduledMapMessages } from "./ScheduledMapMessages";
+import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 import { setupApi, type Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, TechnicalDetails } from "../../components/common/DisplayPrimitives";
@@ -711,8 +712,9 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
     </label>;
   };
 
-  return <section className="panel admin-tools-panel">
-    <h2>Admin Tools</h2>
+  return <LayoutZone page="Admin Tools" className="panel admin-tools-panel">
+    <h2 className="wide">Admin Tools</h2>
+    <LayoutWidget id="admin.liveTools" title="Global Live Tools (Broadcast, MOTD, Chat)">
     <div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Global Live Tools</span></button>
       {liveToolsOpen && <div className="playerAdmin_toggleBody"><div className="global-live-tools">
@@ -790,6 +792,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         </div>
       </div></div>}
     </div>
+    </LayoutWidget>
+    <LayoutWidget id="admin.schedule" title="Schedule Server Restart & Queue">
     <div className={`playerAdmin_toggle ${scheduleOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={scheduleOpen ? "Collapse Schedule Server Restart" : "Expand Schedule Server Restart"} onClick={() => setScheduleOpen(!scheduleOpen)}>{scheduleOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Schedule Server Restart</span></button>
       {scheduleOpen && <div className="playerAdmin_toggleBody">
@@ -893,6 +897,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         {shutdownProtectionResult?.status === "failed" && shutdownProtectionValues.manual_install_command && <p className="danger-note">If automatic install is not available in this environment, run this on the Linux host: <code>{shutdownProtectionValues.manual_install_command}</code></p>}
       </div>}
     </div>
+    </LayoutWidget>
+    <LayoutWidget id="admin.transfer" title="Character Transfer Settings">
     <div className={`playerAdmin_toggle ${transferOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={transferOpen ? "Collapse Character Transfer Settings" : "Expand Character Transfer Settings"} onClick={() => setTransferOpen(!transferOpen)}>{transferOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Character Transfer Settings</span></button>
       {transferOpen && <div className="playerAdmin_toggleBody">
@@ -921,6 +927,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         {transferResult?.status === "failed" && transferResult.details && <p className="danger-note" role="alert">{transferResult.details}</p>}
       </div>}
     </div>
+    </LayoutWidget>
+    <LayoutWidget id="admin.history" title="Admin Command History">
     <div className={`playerAdmin_toggle admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={historyOpen ? "Collapse Command History" : "Expand Command History"} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Command History</span></button>
       {historyOpen && <div className="playerAdmin_toggleBody"><div className="admin-history-content">
@@ -929,7 +937,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         {history && <TechnicalDetails title="Advanced history output" text={history} />}
       </div></div>}
     </div>
-  </section>;
+    </LayoutWidget>
+  </LayoutZone>;
 }
 
 function formatResultTitle(value: unknown, pending = false) {
