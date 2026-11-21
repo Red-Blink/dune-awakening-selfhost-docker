@@ -8,6 +8,7 @@ import { ApiKeysSection } from "./ApiKeysSection";
 import { ExperimentalFeatures } from "./ExperimentalFeatures";
 import { EncryptedApiSection } from "./EncryptedApiSection";
 import { ConsoleAccessNotice, type ConsoleAccessStatus } from "./ConsoleAccessNotice";
+import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 
 type SettingsTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type PublicDirectorySettings = {
@@ -268,117 +269,133 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
     {serverListingError && <p className="error settings-server-listing-error">{serverListingError}</p>}
     {serverListingVisible && serverListingEnabled && publicDirectory.probeError &&
       <p className="error settings-server-listing-error">Server listing issue: {publicDirectory.probeError}</p>}
-    <div className="settings-section-stack">
-      {serverListingVisible && <div className={`playerAdmin_toggle settings-public-profile-toggle ${publicProfileOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={publicProfileOpen ? "Collapse Public Listing Profile" : "Expand Public Listing Profile"} onClick={() => setPublicProfileOpen(!publicProfileOpen)}>
-          {publicProfileOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          <span>Public Listing Profile</span>
-        </button>
-        {publicProfileOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from {publicListingUrl
-            ? <a className="settings-server-page-link" href={publicListingUrl} target="_blank" rel="noreferrer">[Your Server Page]</a>
-            : "[Your Server Page]"}, then paste it below.</p>
-          <label className="settings-discord-field">
-            <span className="field-label-row"><span className="settings-discord-label">Generated Claim Code</span></span>
-            <input
-              disabled={publicProfileSaving}
-              value={claimCode}
-              onChange={(event) => setClaimCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 14))}
-              placeholder="ABCD-EF12-3456"
-              autoComplete="off"
-            />
-          </label>
-          <div className="action-row">
-            <button disabled={publicProfileSaving || claimCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => { void verifyListingClaim(); }}>
-              {publicProfileSaving ? "Verifying..." : "Verify Generated Code"}
-            </button>
-            {publicProfileResult && <span className={`inline-task-result result-${publicProfileResult.status === "succeeded" ? "ok" : publicProfileResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={publicProfileResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(publicProfileResult.title, publicProfileResult.status === "running")}</strong>
-              {publicProfileResult.message && <span className="inline-task-message">{formatResultMessage(publicProfileResult.message)}</span>}
-            </span>}
-          </div>
-        </div>}
-      </div>}
-      <div className={`playerAdmin_toggle settings-server-startup-toggle ${serverStartupOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={serverStartupOpen ? "Collapse Server Startup" : "Expand Server Startup"} onClick={() => setServerStartupOpen(!serverStartupOpen)}>
-          {serverStartupOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          <span>Server Startup</span>
-        </button>
-        {serverStartupOpen && <div className="playerAdmin_toggleBody settings-server-startup-body">
-          <div className="settings-server-startup-copy">
-            <strong>Start Battlegroup Automatically</strong>
-            <p className="muted">The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.</p>
-          </div>
-          <label className={`switch-checkbox settings-server-startup-control ${autoStartBattlegroup ? "enabled" : "disabled"}`}>
-            <input
-              type="checkbox"
-              disabled={serverStartupSaving || settings === null}
-              checked={autoStartBattlegroup}
-              onChange={(event) => { void changeServerStartup(event.target.checked); }}
-            />
-            <span className="switch-label">Automatic Startup:</span>
-            <strong className="switch-state">{serverStartupSaving ? "Saving" : autoStartBattlegroup ? "Enabled" : "Disabled"}</strong>
-          </label>
-          {serverStartupResult && <span className={`inline-task-result settings-server-startup-result result-${serverStartupResult.status === "succeeded" ? "ok" : serverStartupResult.status === "failed" ? "fail" : "running"}`}>
-            <strong className={serverStartupResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serverStartupResult.title, serverStartupResult.status === "running")}</strong>
-            {serverStartupResult.message && <span className="inline-task-message">{formatResultMessage(serverStartupResult.message)}</span>}
-          </span>}
-        </div>}
-      </div>
-      <RuntimeSettingsSummary settings={settings} />
-      <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
-      <ExperimentalFeatures confirmAction={confirmAction} />
-      <div className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>
-        {webPortOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Change the browser port used by this web console.</p>
-          <p className="attention-text">After saving, this page will stop responding on port {currentPort}. Open the new address shown in the result message.</p>
-          <div className="settings-password-grid settings-web-port-grid">
-            <label>Console Port<input disabled={webPortSaving} type="number" min="1" max="65535" step="1" value={webPort} onChange={(event) => setWebPort(event.target.value.replace(/[^\d]/g, "").slice(0, 5))} placeholder="8088" /></label>
-          </div>
-          <div className="action-row">
-            <button disabled={webPortSaving || Boolean(webPortRedirectUrl) || !webPort || webPort === currentPort} onClick={() => { void changeWebPort(); }}>{webPortSaving ? "Saving..." : "Save And Restart Console"}</button>
-            {webPortResult && <span className={`inline-task-result result-${webPortResult.status === "succeeded" ? "ok" : webPortResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={webPortResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(webPortResult.title, webPortResult.status === "running")}</strong>
-              <span className="inline-task-message">{formatWebPortResultMessage(webPortResult, webPortRedirectUrl, webPortRedirectCountdown)}</span>
-            </span>}
-          </div>
-        </div>}
-      </div>
-      <div className={`playerAdmin_toggle settings-login-password-toggle ${loginPasswordOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={loginPasswordOpen ? "Collapse Login Password" : "Expand Login Password"} onClick={() => setLoginPasswordOpen(!loginPasswordOpen)}>{loginPasswordOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Login Password</span></button>
-        {loginPasswordOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Change the password used to sign in to this web console.</p>
-          {passwordEnvManaged && <p className="attention-text">The login password is managed by <code>ADMIN_PASSWORD</code>. Update the environment value to change it.</p>}
-          <div className="settings-password-grid">
-            <label>Current Password<SecretInput disabled={passwordEnvManaged || passwordSaving} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password" /></label>
-            <label>New Password<SecretInput disabled={passwordEnvManaged || passwordSaving} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At Least 13 Characters" /></label>
-            <label><span className="field-label-row"><span>Confirm New Password</span>{confirmStarted && <span className={`password-match-inline ${passwordsMatch ? "passed" : "missing"}`}>{passwordsMatch ? "Matches" : "Passwords do not match"}</span>}</span><SecretInput disabled={passwordEnvManaged || passwordSaving} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" /></label>
-          </div>
-          {passwordStarted && <div className="password-check-box">
-            <strong>Password Requirements</strong>
-            <ul className="password-requirements" aria-label="Password requirements">
-              {passwordChecks.map((check) => <li className={check.passed ? "passed" : "missing"} key={check.label}>{check.label}</li>)}
-            </ul>
+    <LayoutZone page="Settings" className="settings-section-stack">
+      <LayoutWidget id="settings.publicProfile" widgetTitle="Public Listing Profile">
+        {serverListingVisible && <div className={`playerAdmin_toggle settings-public-profile-toggle ${publicProfileOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={publicProfileOpen ? "Collapse Public Listing Profile" : "Expand Public Listing Profile"} onClick={() => setPublicProfileOpen(!publicProfileOpen)}>
+            {publicProfileOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <span>Public Listing Profile</span>
+          </button>
+          {publicProfileOpen && <div className="playerAdmin_toggleBody">
+            <p className="muted">Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from {publicListingUrl
+              ? <a className="settings-server-page-link" href={publicListingUrl} target="_blank" rel="noreferrer">[Your Server Page]</a>
+              : "[Your Server Page]"}, then paste it below.</p>
+            <label className="settings-discord-field">
+              <span className="field-label-row"><span className="settings-discord-label">Generated Claim Code</span></span>
+              <input
+                disabled={publicProfileSaving}
+                value={claimCode}
+                onChange={(event) => setClaimCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 14))}
+                placeholder="ABCD-EF12-3456"
+                autoComplete="off"
+              />
+            </label>
+            <div className="action-row">
+              <button disabled={publicProfileSaving || claimCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => { void verifyListingClaim(); }}>
+                {publicProfileSaving ? "Verifying..." : "Verify Generated Code"}
+              </button>
+              {publicProfileResult && <span className={`inline-task-result result-${publicProfileResult.status === "succeeded" ? "ok" : publicProfileResult.status === "failed" ? "fail" : "running"}`}>
+                <strong className={publicProfileResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(publicProfileResult.title, publicProfileResult.status === "running")}</strong>
+                {publicProfileResult.message && <span className="inline-task-message">{formatResultMessage(publicProfileResult.message)}</span>}
+              </span>}
+            </div>
           </div>}
-          <div className="action-row">
-            <button disabled={passwordEnvManaged || passwordSaving || !passwordMeetsRequirements || !passwordsMatch} onClick={() => { void changeLoginPassword(); }}>{passwordSaving ? "Saving..." : "Change Password"}</button>
-            {passwordResult && <span className={`inline-task-result result-${passwordResult.status === "succeeded" ? "ok" : passwordResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={passwordResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(passwordResult.title, passwordResult.status === "running")}</strong>
-              {passwordResult.message && <span className="inline-task-message">{formatResultMessage(passwordResult.message)}</span>}
-            </span>}
-          </div>
         </div>}
-      </div>
-      <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
-        {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
-      </div>
-      <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>
-        {apiKeysOpen && <div className="playerAdmin_toggleBody"><ApiKeysSection confirmAction={confirmAction} /></div>}
-      </div>
-    </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.serverStartup" widgetTitle="Server Startup">
+        <div className={`playerAdmin_toggle settings-server-startup-toggle ${serverStartupOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={serverStartupOpen ? "Collapse Server Startup" : "Expand Server Startup"} onClick={() => setServerStartupOpen(!serverStartupOpen)}>
+            {serverStartupOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <span>Server Startup</span>
+          </button>
+          {serverStartupOpen && <div className="playerAdmin_toggleBody settings-server-startup-body">
+            <div className="settings-server-startup-copy">
+              <strong>Start Battlegroup Automatically</strong>
+              <p className="muted">The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.</p>
+            </div>
+            <label className={`switch-checkbox settings-server-startup-control ${autoStartBattlegroup ? "enabled" : "disabled"}`}>
+              <input
+                type="checkbox"
+                disabled={serverStartupSaving || settings === null}
+                checked={autoStartBattlegroup}
+                onChange={(event) => { void changeServerStartup(event.target.checked); }}
+              />
+              <span className="switch-label">Automatic Startup:</span>
+              <strong className="switch-state">{serverStartupSaving ? "Saving" : autoStartBattlegroup ? "Enabled" : "Disabled"}</strong>
+            </label>
+            {serverStartupResult && <span className={`inline-task-result settings-server-startup-result result-${serverStartupResult.status === "succeeded" ? "ok" : serverStartupResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={serverStartupResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serverStartupResult.title, serverStartupResult.status === "running")}</strong>
+              {serverStartupResult.message && <span className="inline-task-message">{formatResultMessage(serverStartupResult.message)}</span>}
+            </span>}
+          </div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.runtime" widgetTitle="Runtime Configuration & Files">
+        <RuntimeSettingsSummary settings={settings} />
+      </LayoutWidget>
+      <LayoutWidget id="settings.access" widgetTitle="Console Access & Experimental Features">
+        <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
+        <ExperimentalFeatures confirmAction={confirmAction} />
+      </LayoutWidget>
+      <LayoutWidget id="settings.webPort" widgetTitle="Web Console Port">
+        <div className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>
+          {webPortOpen && <div className="playerAdmin_toggleBody">
+            <p className="muted">Change the browser port used by this web console.</p>
+            <p className="attention-text">After saving, this page will stop responding on port {currentPort}. Open the new address shown in the result message.</p>
+            <div className="settings-password-grid settings-web-port-grid">
+              <label>Console Port<input disabled={webPortSaving} type="number" min="1" max="65535" step="1" value={webPort} onChange={(event) => setWebPort(event.target.value.replace(/[^\d]/g, "").slice(0, 5))} placeholder="8088" /></label>
+            </div>
+            <div className="action-row">
+              <button disabled={webPortSaving || Boolean(webPortRedirectUrl) || !webPort || webPort === currentPort} onClick={() => { void changeWebPort(); }}>{webPortSaving ? "Saving..." : "Save And Restart Console"}</button>
+              {webPortResult && <span className={`inline-task-result result-${webPortResult.status === "succeeded" ? "ok" : webPortResult.status === "failed" ? "fail" : "running"}`}>
+                <strong className={webPortResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(webPortResult.title, webPortResult.status === "running")}</strong>
+                <span className="inline-task-message">{formatWebPortResultMessage(webPortResult, webPortRedirectUrl, webPortRedirectCountdown)}</span>
+              </span>}
+            </div>
+          </div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.password" widgetTitle="Login Password">
+        <div className={`playerAdmin_toggle settings-login-password-toggle ${loginPasswordOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={loginPasswordOpen ? "Collapse Login Password" : "Expand Login Password"} onClick={() => setLoginPasswordOpen(!loginPasswordOpen)}>{loginPasswordOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Login Password</span></button>
+          {loginPasswordOpen && <div className="playerAdmin_toggleBody">
+            <p className="muted">Change the password used to sign in to this web console.</p>
+            {passwordEnvManaged && <p className="attention-text">The login password is managed by <code>ADMIN_PASSWORD</code>. Update the environment value to change it.</p>}
+            <div className="settings-password-grid">
+              <label>Current Password<SecretInput disabled={passwordEnvManaged || passwordSaving} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password" /></label>
+              <label>New Password<SecretInput disabled={passwordEnvManaged || passwordSaving} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At Least 13 Characters" /></label>
+              <label><span className="field-label-row"><span>Confirm New Password</span>{confirmStarted && <span className={`password-match-inline ${passwordsMatch ? "passed" : "missing"}`}>{passwordsMatch ? "Matches" : "Passwords do not match"}</span>}</span><SecretInput disabled={passwordEnvManaged || passwordSaving} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" /></label>
+            </div>
+            {passwordStarted && <div className="password-check-box">
+              <strong>Password Requirements</strong>
+              <ul className="password-requirements" aria-label="Password requirements">
+                {passwordChecks.map((check) => <li className={check.passed ? "passed" : "missing"} key={check.label}>{check.label}</li>)}
+              </ul>
+            </div>}
+            <div className="action-row">
+              <button disabled={passwordEnvManaged || passwordSaving || !passwordMeetsRequirements || !passwordsMatch} onClick={() => { void changeLoginPassword(); }}>{passwordSaving ? "Saving..." : "Change Password"}</button>
+              {passwordResult && <span className={`inline-task-result result-${passwordResult.status === "succeeded" ? "ok" : passwordResult.status === "failed" ? "fail" : "running"}`}>
+                <strong className={passwordResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(passwordResult.title, passwordResult.status === "running")}</strong>
+                {passwordResult.message && <span className="inline-task-message">{formatResultMessage(passwordResult.message)}</span>}
+              </span>}
+            </div>
+          </div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.encryptedApi" widgetTitle="Encrypted API Access">
+        <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
+          {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.apiKeys" widgetTitle="API Keys">
+        <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>
+          {apiKeysOpen && <div className="playerAdmin_toggleBody"><ApiKeysSection confirmAction={confirmAction} /></div>}
+        </div>
+      </LayoutWidget>
+    </LayoutZone>
   </section>;
 }
 
