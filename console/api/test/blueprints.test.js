@@ -40,6 +40,7 @@ function fakeBlueprintDb(calls) {
   const blueprints = [];
   const instances = [];
   const placeables = [];
+  const pitchFirstLayouts = new Map();
   const pentashields = [];
   const deleted = new Set();
 
@@ -97,7 +98,18 @@ function fakeBlueprintDb(calls) {
         return { rows: [], rowCount: 1 };
       }
       if (text.includes("insert into dune.building_blueprint_placeables")) {
-        placeables.push({ blueprint_id: values[0], placeable_id: values[1], type: values[2], transform: values[3] });
+        placeables.push({ blueprint_id: values[0], placeable_id: values[1], type: values[2], building_type: values[2], transform: values[3] });
+        return { rows: [], rowCount: 1 };
+      }
+      if (text.includes("insert into dune.console_blueprint_pitch_first")) {
+        pitchFirstLayouts.set(values[0], values[1]);
+        return { rows: [], rowCount: 1 };
+      }
+      if (text.includes("select 1 from dune.console_blueprint_pitch_first")) {
+        return { rows: pitchFirstLayouts.get(values[0]) === values[1] ? [{}] : [] };
+      }
+      if (text.includes("delete from dune.console_blueprint_pitch_first")) {
+        pitchFirstLayouts.delete(values[0]);
         return { rows: [], rowCount: 1 };
       }
       if (text.includes("insert into dune.building_blueprint_pentashields")) {
@@ -135,13 +147,16 @@ function fakeBlueprintDb(calls) {
       }
       if (text.includes("FBuildingBlueprintItemStats") && text.includes("where bb.id")) {
         const bpId = Number(values[0]);
-        return { rows: [{ name: blueprintNames.get(bpId) || "" }] };
+        return { rows: [{ name: blueprintNames.get(bpId) || "", item_id: blueprints.find((row) => row.id === bpId)?.item_id }] };
       }
       if (text.includes("from dune.building_blueprint_instances") && text.includes("where building_blueprint_id") && values.length > 0) {
         return { rows: instances.filter(i => i.blueprint_id === Number(values[0])) };
       }
       if (text.includes("from dune.building_blueprint_placeables") && text.includes("where building_blueprint_id") && values.length > 0) {
-        return { rows: placeables.filter(p => p.blueprint_id === Number(values[0])) };
+        return { rows: placeables.filter(p => p.blueprint_id === Number(values[0])).map((row) => ({
+          ...row,
+          transform: typeof row.transform === "string" ? row.transform.slice(1, -1).split(",").map(Number) : row.transform
+        })) };
       }
       if (text.includes("from dune.building_blueprint_pentashields") && text.includes("where building_blueprint_id") && values.length > 0) {
         return { rows: pentashields.filter(p => p.blueprint_id === Number(values[0])) };
@@ -254,7 +269,7 @@ test("import blueprint inserts placeables with 6-element transform", async () =>
   });
   assert.equal(placeables.length, 1);
   assert.equal(placeables[0].type, "Generator_Placeable");
-  assert.equal(placeables[0].transform, "{-149,968,386,180,10,5}");
+  assert.equal(placeables[0].transform, "{-149,968,386,10,180,5}");
 });
 
 test("import blueprint removes small and advanced Sub-Fief claim consoles", async () => {
@@ -313,23 +328,34 @@ test("import blueprint repairs the legacy live-export placeable rotation axis", 
     ]
   });
   assert.deepEqual(placeables.map((row) => row.transform), [
-    "{10,20,30,170,0,0}",
-    "{40,50,60,-10,0,0}"
+    "{10,20,30,0,170,0}",
+    "{40,50,60,0,-10,0}"
   ]);
 });
 
-test("import blueprint preserves native placeable rotation axes", async () => {
+test("import blueprint stores pitch, yaw and roll in game projection order and exports them unchanged", async () => {
+  const { db, placeables } = fakeBlueprintDb([]);
+  const source = [
+    { placeable_id: 1, building_type: "LargeWaterCistern_Placeable", x: 10, y: 20, z: 30, rx: 0, ry: 90, rz: 0 },
+    { placeable_id: 2, building_type: "Choam_LightWall_Placeable", x: 40, y: 50, z: 60, rx: 5, ry: -90, rz: 2 }
+  ];
+  const { blueprintId } = await importBlueprint(db, 123, { placeables: source });
+  assert.deepEqual(placeables.map((row) => row.transform), [
+    "{10,20,30,0,90,0}",
+    "{40,50,60,5,-90,2}"
+  ]);
+  const exported = await exportBlueprint(db, blueprintId);
+  assert.deepEqual(exported.placeables, source);
+  assert.equal(exported.designer.placeableRotationConvention, "native-yaw-y");
+});
+
+test("import preserves roll-only rotations in explicitly marked game blueprints", async () => {
   const { db, placeables } = fakeBlueprintDb([]);
   await importBlueprint(db, 123, {
-    placeables: [
-      { building_type: "LargeWaterCistern_Placeable", x: 10, y: 20, z: 30, rx: 0, ry: 90, rz: 0 },
-      { building_type: "Choam_LightWall_Placeable", x: 40, y: 50, z: 60, rx: 5, ry: -90, rz: 2 }
-    ]
+    designer: { coordinateConvention: "game-v1", placeableRotationConvention: "native-yaw-y" },
+    placeables: [{ building_type: "Generator_Placeable", x: 10, y: 20, z: 30, rx: 0, ry: 0, rz: 35 }]
   });
-  assert.deepEqual(placeables.map((row) => row.transform), [
-    "{10,20,30,90,0,0}",
-    "{40,50,60,-90,5,2}"
-  ]);
+  assert.equal(placeables[0].transform, "{10,20,30,0,0,35}");
 });
 
 test("import blueprint inserts pentashields with ordinary PostgreSQL scale bounds", async () => {
