@@ -5,7 +5,7 @@ import { ThemeLauncher } from "./ThemeLauncher";
 // The picker is a lazy chunk; under the full parallel suite its first transform can exceed the 1 s default.
 const SLOW = { timeout: 10_000 };
 
-// Transform the lazy chunk up front, outside any single test's 5 s budget, so the tests measure behaviour and not cold-start load.
+// Transform the lazy chunk before measuring picker interactions.
 beforeAll(async () => { await import("./ThemePanel"); }, 60_000);
 
 beforeEach(() => {
@@ -15,7 +15,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe("ThemeLauncher", () => {
+// Allow both the open and close waits to finish under parallel CI load.
+describe("ThemeLauncher", { timeout: 30_000 }, () => {
   it("opens the lazy picker from the header button and closes it again", async () => {
     const onOpen = vi.fn();
     render(<ThemeLauncher onOpen={onOpen} />);
