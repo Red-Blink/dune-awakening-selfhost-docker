@@ -54,3 +54,30 @@ describe("Player Summary hero actions", () => {
     frame.mockRestore();
   });
 });
+
+describe("Player Journey edits", () => {
+  it("requires explicit confirmation of a changed server build before submitting an edit", async () => {
+    const journey = vi.spyOn(playersApi, "journey").mockResolvedValue({
+      capabilities: { journey: true }, unverifiedBuild: "999",
+      rows: { story: [{ id: "DA_Example", name: "Example Journey", category: "Story", status: "Incomplete" }] }
+    });
+    const complete = vi.spyOn(playersApi, "completeJourneyNode").mockResolvedValue({ supported: true });
+    try {
+      const confirm = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false).mockResolvedValue(true);
+      renderAdmin("Offline", confirm);
+      fireEvent.click(screen.getByRole("button", { name: "Journey" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Story \(1\)/ }));
+      const button = await screen.findByRole("button", { name: "Complete" });
+      fireEvent.click(button);
+      await waitFor(() => expect(confirm).toHaveBeenCalledTimes(2));
+      expect(complete).not.toHaveBeenCalled();
+      fireEvent.click(button);
+      await waitFor(() => expect(complete).toHaveBeenCalledWith("1", {
+        nodeId: "DA_Example", confirmation: "COMPLETE JOURNEY NODE", confirmedBuild: "999"
+      }));
+    } finally {
+      complete.mockRestore();
+      journey.mockRestore();
+    }
+  });
+});

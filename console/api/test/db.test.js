@@ -8326,16 +8326,15 @@ test("journey completion updates the selected subtree without completing ancesto
   assert.ok(calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Story.Child")));
 });
 
-test("Find the Fremen completion grants its extra tag, TechKnowledge rewards, and Spice Vision", async () => {
+test("Find the Fremen grants the card schematics without forcing global Spice Vision or reward flags", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, { currentResearchItems: [] });
   const result = await completeJourneyNode(db, 123, { nodeId: "DA_MQ_FindTheFremen" }, {
     journey_node_tags: { "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.CompleteFirstTest": ["JourneySets.Fremkit.First"] }
   });
-  assert.equal(result.recipesGranted, 5);
-  assert.ok(calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Journey.RewardsUnblocked")));
-  assert.equal(calls.filter((call) => call.text.includes("TechKnowledgePlayerComponent,m_TechKnowledge,m_TechKnowledgeData") && call.text.includes("update dune.actors")).length, 5);
-  assert.ok(calls.some((call) => call.text.includes("FSpiceAddictionComponent,1,SystemStatus")));
+  assert.equal(result.recipesGranted, 8);
+  assert.ok(!calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Journey.RewardsUnblocked")));
+  assert.ok(!calls.some((call) => call.text.includes("FSpiceAddictionComponent,1,SystemStatus")));
 });
 
 test("contract completion applies skills, removes superseded tags, and dismisses its active item", async () => {

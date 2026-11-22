@@ -262,7 +262,7 @@ Player rows include `total_playtime_seconds`. The console samples `player_state.
 | GET | `/api/players/{playerId}/dungeons` | List the dungeon runs the player took part in, from `dune.dungeon_completion` and `dune.dungeon_completion_players` (whose `player_id` is the Player Controller id). Returns `{ totalRuns, truncated, runs: [{ completionId, dungeonId, difficulty, durationMs, playerCount, party: [{ controllerId, actorId, characterName }] }] }`, newest first, at most 500 runs (`truncated` is true when there are more). The game stores no completion time, so order is by `completionId`. `difficulty` is the raw game integer. When either table is missing it returns `{ capabilities: { dungeons: false }, rows: [], reason }` instead. For every run on the server, see [Dungeons](#dungeons) | `playerId` |
 | GET | `/api/players/{playerId}/crafting-recipes` | Get unlocked recipes | `playerId` |
 | GET | `/api/players/{playerId}/research-items` | Get research progress | `playerId` |
-| GET | `/api/players/{playerId}/journey` | Get journey node completion | `playerId` |
+| GET | `/api/players/{playerId}/journey` | Get journey progress, read-only contract rows and the detected server build when it differs from the catalog | `playerId` |
 | GET | `/api/players/{playerId}/events` | Get player events | `playerId` (unsupported) |
 | GET | `/api/players/{playerId}/stats` | Get player stats | `playerId` (unsupported) |
 | GET | `/api/players/{playerId}/history` | Get player history | `playerId` (unsupported) |
@@ -327,8 +327,8 @@ These customization IDs are excluded from the general inventory catalog.
 | POST | `/api/players/{playerId}/specializations/keystones/reset-all` | Reset all keystones | `confirmation: "RESET ALL KEYSTONES"` |
 | POST | `/api/players/{playerId}/crafting-recipes/unlock` | Unlock recipe | `recipeId`, `confirmation: "UNLOCK CRAFTING RECIPE"` |
 | POST | `/api/players/{playerId}/research-items/unlock` | Unlock research | `itemKey`, `confirmation: "UNLOCK RESEARCH ITEM"` |
-| POST | `/api/players/{playerId}/journey/complete` | Complete journey node | `nodeId` (max 500 characters), `confirmation: "COMPLETE JOURNEY NODE"` |
-| POST | `/api/players/{playerId}/journey/reset` | Reset journey node | `nodeId`, `confirmation: "RESET JOURNEY NODE"` |
+| POST | `/api/players/{playerId}/journey/complete` | Complete an offline player's selected journey and update known dependencies, tags and schematic unlocks | `nodeId` (max 500 characters), `confirmation: "COMPLETE JOURNEY NODE"`, `confirmedBuild` when the Journey response supplies an `unverifiedBuild` |
+| POST | `/api/players/{playerId}/journey/reset` | Clear journey progress and cooldowns and reconcile dependent steps. Existing XP, inventory and recipes are retained | `nodeId`, `confirmation: "RESET JOURNEY NODE"`, `confirmedBuild` when the Journey response supplies an `unverifiedBuild` |
 | POST | `/api/players/{playerId}/tutorials/complete` | Complete tutorial | `tutorialId` (integer 1-32767), `confirmation: "COMPLETE TUTORIAL"` |
 | POST | `/api/players/{playerId}/tutorials/reset` | Reset tutorial | `tutorialId` (integer 1-32767), `confirmation: "RESET TUTORIAL"` |
 | POST | `/api/players/{playerId}/building-unlocks/grant` | Grant one Building Set. No-op if already owned or pending; `status` is `Delivered` (online) or `Pending` | `itemId`, `confirmation: "GRANT BUILDING UNLOCK"` |

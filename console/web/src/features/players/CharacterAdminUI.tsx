@@ -62,7 +62,7 @@ export const PLAYER_ADMIN_SKILL_TREES: Record<string, { tree: string; cards: Ski
 };
 
 type StarterSkillPreset = { label: string; modules: { id: string; level: number }[] };
-type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
+type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; readOnly?: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
 type CurrencyOption = { id: number; label: string };
 
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
@@ -179,6 +179,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_journeyRows, playerAdmin_setJourneyRows] = useState<Record<string, JourneyRow[]>>({ story: [], contract: [], codex: [], tutorial: [] });
   const [playerAdmin_journeyLoading, playerAdmin_setJourneyLoading] = useState(false);
   const [playerAdmin_journeyError, playerAdmin_setJourneyError] = useState("");
+  const [unverifiedJourneyBuild, setUnverifiedJourneyBuild] = useState<string>();
   const [playerAdmin_journeyFilter, playerAdmin_setJourneyFilter] = useState("");
   const [playerAdmin_expandedJourney, playerAdmin_setExpandedJourney] = useState<Record<string, boolean>>({});
   const [playerAdmin_vehicleId, playerAdmin_setVehicleId] = useState("");
@@ -665,6 +666,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         dependency: String(row.dependency || row.parentId || ""),
         status: String(row.status || "Incomplete"),
         complete: Boolean(row.complete),
+        readOnly: Boolean(row.readOnly),
         revealed: Boolean(row.revealed),
         pendingReward: Boolean(row.pendingReward),
         tags: Number(row.tags || 0),
@@ -682,6 +684,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     playerAdmin_setJourneyError("");
     try {
       const response = await playersApi.journey(dbPlayerId);
+      setUnverifiedJourneyBuild(response.unverifiedBuild || undefined);
       playerAdmin_setJourneyRows(playerAdmin_mapJourneyRows(response.rows));
     } catch (error) {
       playerAdmin_setJourneyRows({ story: [], contract: [], codex: [], tutorial: [] });
@@ -703,20 +706,30 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       onError(error instanceof Error ? error.message : String(error));
     }
   }
+  async function confirmJourneyBuild(row: JourneyRow) {
+    if (row.category === "Tutorial" || !unverifiedJourneyBuild) return true;
+    return confirmAction(`The journey catalog was verified on server build 26591491. Your server is running build ${unverifiedJourneyBuild}, which may have different progression rules. Continue with this edit?`, {
+      title: "Unverified Game Build", confirmLabel: "Continue", danger: true
+    });
+  }
   async function playerAdmin_completeJourney(row: JourneyRow) {
     const key = `journey:${row.category}:${row.id}`;
     onError("");
-    if (!(await confirmAction(`Mark "${row.name}" complete for ${playerName}? The player must be fully offline; the change takes effect on the next login.`, {
+    const rewardNote = row.category === "Story" || row.category === "Contract"
+      ? " The Console updates progress and known unlocks. XP, Solaris and inventory items are excluded from this action."
+      : "";
+    if (!(await confirmAction(`Mark "${row.name}" complete for ${playerName}? The player must be offline. The change takes effect on the next login.${rewardNote}`, {
       title: "Complete Journey Node",
       confirmLabel: "Complete",
       details: [{ label: "Player", value: playerName, tone: "accent" }, { label: "Node", value: row.name }]
     }))) return;
+    if (!(await confirmJourneyBuild(row))) return;
     playerAdmin_showResult(key, `Completing ${row.name} for ${playerName}`, "neutral", true);
     try {
       const response = row.category === "Tutorial"
         ? await playersApi.completeTutorial(dbPlayerId, { tutorialId: row.id, confirmation: "COMPLETE TUTORIAL" })
-        : await playersApi.completeJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "COMPLETE JOURNEY NODE" });
-      const changed = Number(response.result?.updatedRows || response.result?.deletedRows || 1);
+        : await playersApi.completeJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "COMPLETE JOURNEY NODE", confirmedBuild: unverifiedJourneyBuild });
+      const changed = Number(response.result?.updatedRows ?? response.result?.deletedRows ?? 1);
       playerAdmin_showResult(key, `${row.name} was completed for ${playerName}.`, "success");
       playerAdmin_addLog(`Complete ${row.category}`, row.rawName || row.id, String(changed), "Succeeded");
       await playerAdmin_loadJourneyRows();
@@ -735,11 +748,12 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       danger: true,
       details: [{ label: "Player", value: playerName, tone: "accent" }, { label: "Node", value: row.name, tone: "danger" }]
     }))) return;
+    if (!(await confirmJourneyBuild(row))) return;
     playerAdmin_showResult(key, `Resetting ${row.name} for ${playerName}`, "neutral", true);
     try {
       const response = row.category === "Tutorial"
         ? await playersApi.resetTutorial(dbPlayerId, { tutorialId: row.id, confirmation: "RESET TUTORIAL" })
-        : await playersApi.resetJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "RESET JOURNEY NODE" });
+        : await playersApi.resetJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "RESET JOURNEY NODE", confirmedBuild: unverifiedJourneyBuild });
       const changed = Number(response.result?.updatedRows || response.result?.deletedRows || 0);
       playerAdmin_showResult(key, `${row.name} was reset for ${playerName}.`, "neutral");
       playerAdmin_addLog(`Reset ${row.category}`, row.rawName || row.id, String(changed), "Succeeded");
@@ -1135,7 +1149,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               <td className="playerAdmin_resultCell"><InlineActionResult result={playerAdmin_actionResult} resultKey={key} /></td>
               <td className="playerAdmin_actionCell">
                 <div className="playerAdmin_actionCellInner">
-                {journeyActionsAvailable(row.category) ? <>
+                {journeyActionsAvailable(row.category) && !row.readOnly ? <>
                   <button disabled={!dbPlayerId || row.complete || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_completeJourney(row)}>Complete</button>
                   <button disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_resetJourney(row)}>Reset</button>
                 </> : <span className="playerAdmin_note" title="The game manages related rewards, schematics, and tags.">Read-only</span>}

@@ -7,6 +7,15 @@ const catalog = JSON.parse(readFileSync(
   "utf8"
 ));
 
+test("new quest contracts keep their native completion tags and tagless contracts remain distinguishable", () => {
+  assert.deepEqual(catalog.contract_tags.DA_CT_Chapter3_DeliverSpiceToElara,
+    ["Contract.Tracking.Completed.Elara.DeliveredSpiceBribe"]);
+  assert.deepEqual(catalog.contract_tags.DA_CT_Fac_Atre_Rep01_01_Arms, []);
+  assert.equal(catalog.contract_aliases.Halloween_Day01, "DA_CT_Halloween_Day01");
+  assert.ok(catalog.contract_remove_tags.DA_CT_Halloween_Day01.length > 0);
+  assert.equal(catalog.contract_aliases.AAAdebug_AbilitiesCondition, undefined);
+});
+
 test("journey catalog contains the verified official display names", () => {
   assert.equal(Object.keys(catalog.journey_aliases).length, 971);
   assert.equal(catalog.journey_aliases.DA_MQ_NPEAutocompleted, "The Fall of the Proteus");
