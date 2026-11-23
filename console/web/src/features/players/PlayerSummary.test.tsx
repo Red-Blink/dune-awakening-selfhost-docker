@@ -10,7 +10,8 @@ vi.mock("../../api/players", () => ({
     progression: vi.fn(),
     intel: vi.fn(),
     solarisCoin: vi.fn(),
-    vitals: vi.fn()
+    vitals: vi.fn(),
+    dungeons: vi.fn()
   }
 }));
 
@@ -33,6 +34,7 @@ beforeEach(() => {
   vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: {} });
+  vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: {} });
 });
 
 afterEach(() => {
@@ -80,17 +82,17 @@ describe("PlayerSummary", () => {
   });
 
   describe("Guild fallback", () => {
-    it("shows an em dash when no guild is assigned on player or fallback", async () => {
+    it.each([undefined, "", "—", "Unavailable"])("omits the guild badge when detail reports %s", async (guild) => {
       const { container } = render(
         <PlayerSummary
           {...baseProps}
-          detail={{ player: { character_name: "Benny Jesserette" } }}
-          fallback={{}}
+          detail={{ player: { character_name: "Benny Jesserette", guild } }}
+          fallback={{ guild: "Cached Guild" }}
         />
       );
       await settleSummaryLoad();
       const guildMeta = container.querySelector(".summary-hero-guild");
-      expect(guildMeta?.textContent).toContain("—");
+      expect(guildMeta).toBeNull();
     });
 
     it("shows the real guild when present on the loaded player", async () => {
@@ -398,9 +400,8 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Steam ID")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
+      expect(screen.getByText("Steam ID")).toBeInTheDocument();
 
       expect(screen.getAllByText("Platform Identity")).toHaveLength(1);
       const identityBlock = screen.getByText("Platform Identity").closest(".summary-block");
@@ -415,6 +416,25 @@ describe("PlayerSummary", () => {
       expect(screen.getByText("FN1")).toBeInTheDocument();
       expect(screen.getByText("FLS ID")).toBeInTheDocument();
       expect(screen.getByText("user1")).toBeInTheDocument();
+    });
+  });
+
+  describe("Identity dialog", () => {
+    it("opens from the button before Teleport and restores focus on Escape", async () => {
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Benny Jesserette", fls_id: "user1" } }} fallback={{}} actions={<button>Teleport</button>} />);
+      const toggle = await screen.findByRole("button", { name: "Identity" });
+      expect(toggle.nextElementSibling).toBe(screen.getByRole("button", { name: "Teleport" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByText("FLS ID")).not.toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(screen.getByRole("dialog", { name: "Identity" })).toBeInTheDocument();
+      expect(screen.getByText("Platform Identity")).toBeInTheDocument();
+      expect(screen.getByText("Database Identity")).toBeInTheDocument();
+      const close = screen.getByRole("button", { name: "Close dialog" });
+      expect(close).toHaveFocus();
+      fireEvent.keyDown(close, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(toggle).toHaveFocus();
     });
   });
 
@@ -434,9 +454,8 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Account")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
+      expect(screen.getByText("Account")).toBeInTheDocument();
 
       const block = screen.getByText("Database Identity").closest(".summary-block");
       expect(block).not.toBeNull();
@@ -467,9 +486,7 @@ describe("PlayerSummary", () => {
           fallback={{}}
         />
       );
-      await waitFor(() => {
-        expect(screen.getByText("Account")).toBeInTheDocument();
-      });
+      fireEvent.click(await screen.findByRole("button", { name: /Identity/ }));
       const accountRow = screen.getByText("Account").closest("tr");
       expect(accountRow?.textContent).toContain("—");
       const controllerRow = screen.getByText("Player Controller").closest("tr");
@@ -496,10 +513,10 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Level")).toBeInTheDocument();
-        expect(screen.getByText("11")).toBeInTheDocument();
-        expect(screen.getByText("XP")).toBeInTheDocument();
-        expect(screen.getByText((4790).toLocaleString())).toBeInTheDocument();
+        const levelTile = screen.getByText("Level").closest(".summary-stat-level");
+        expect(levelTile).not.toBeNull();
+        expect(levelTile?.querySelector("strong")).toHaveTextContent("11");
+        expect(levelTile?.querySelector("small")).toHaveTextContent(`${(4790).toLocaleString()} XP`);
         expect(screen.getByText("Skill Points")).toBeInTheDocument();
         expect(screen.getByText("3 / 12")).toBeInTheDocument();
       });
@@ -553,6 +570,119 @@ describe("PlayerSummary", () => {
     });
   });
 
+  describe("Dungeon Runs", () => {
+    const party = [{ controllerId: 23, actorId: 23, characterName: "Aster" }, { controllerId: 36, actorId: 36, characterName: "Brin" }];
+
+    it("lists every run with best times, resolved names and formatted durations", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true },
+        totalRuns: 3,
+        truncated: false,
+        runs: [
+          { completionId: 4, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 992717, playerCount: 2, party },
+          { completionId: 3, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 1337938, playerCount: 2, party },
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 883053, playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: null }] }
+        ]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await screen.findByText("Best Time by Difficulty");
+      // Sand Storm: its best-time row, the Highest Difficulty stat and two run rows.
+      expect(screen.getAllByText("Sand Storm")).toHaveLength(4);
+      expect(screen.getAllByText("Dust")).toHaveLength(2);
+      expect(screen.getByTitle("Difficulty 2")).toHaveTextContent("2 16:33");
+      expect(screen.getAllByText("16:33")).toHaveLength(2);
+      expect(screen.getAllByText("22:18")).toHaveLength(1);
+      expect(screen.getByText("Fastest Clear").parentElement).toHaveTextContent("Fastest Clear14:43Dust · 1");
+      expect(screen.getByText("Highest Difficulty").parentElement).toHaveTextContent("Highest Difficulty2Sand Storm");
+      expect(screen.getByText("Dungeons").parentElement).toHaveTextContent("Dungeons2");
+      expect(screen.getAllByText("2 · Aster, Brin")).toHaveLength(2);
+      expect(screen.getByText("1 · Controller 23")).toBeInTheDocument();
+    });
+
+    it("sorts the Party column by party size, not by names", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 2, truncated: false,
+        runs: [
+          { completionId: 2, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 3, party: [{ controllerId: 1, actorId: 1, characterName: "Aaron" }, { controllerId: 2, actorId: 2, characterName: "Bea" }, { controllerId: 3, actorId: 3, characterName: "Cy" }] },
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 2000, playerCount: 1, party: [{ controllerId: 4, actorId: 4, characterName: "Zed" }] }
+        ]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Zed" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("1 · Zed")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("columnheader", { name: /Party/ }).querySelector("button") ?? screen.getByRole("columnheader", { name: /Party/ }));
+      const partyCells = screen.getAllByText(/^\d · /).map((cell) => cell.textContent);
+      expect(partyCells).toEqual(["1 · Zed", "3 · Aaron, Bea, Cy"]);
+    });
+
+    it("collapses a dungeon's best times to 8 chips and the run table to the 5 newest runs", async () => {
+      // The oldest run is also the fastest and should stay visible in the chip list.
+      const runs = Array.from({ length: 12 }, (_, index) => ({
+        completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (12 - index) * 60_000,
+        playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: "Aster" }]
+      }));
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 12, truncated: false, runs });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await screen.findByText("Best Time by Difficulty");
+      const chips = () => document.querySelectorAll("span.summary-chip");
+      const runRows = () => document.querySelectorAll(".summary-dungeons-table tbody tr");
+      expect(chips()).toHaveLength(8);
+      expect([...chips()].map((chip) => chip.querySelector("strong")?.textContent)).toEqual(["12:00", "11:00", "10:00", "9:00", "8:00", "7:00", "6:00", "1:00"]);
+      expect(document.querySelectorAll(".summary-chip-best")).toHaveLength(1);
+      expect(document.querySelector(".summary-chip-best")).toHaveTextContent("12 1:00");
+      expect(runRows()).toHaveLength(5);
+      fireEvent.click(screen.getByRole("columnheader", { name: "Duration" }));
+      expect([...runRows()].map((row) => row.querySelector('td[data-column="duration"]')?.textContent)).toEqual(["8:00", "9:00", "10:00", "11:00", "12:00"]);
+      fireEvent.click(screen.getByRole("button", { name: "+4" }));
+      expect(chips()).toHaveLength(12);
+      fireEvent.click(screen.getByRole("button", { name: "Show Fewer Items" }));
+      expect(chips()).toHaveLength(8);
+      fireEvent.click(screen.getByRole("button", { name: "Show All 12 Items" }));
+      expect(runRows()).toHaveLength(12);
+      fireEvent.click(screen.getByRole("button", { name: "Show Fewer Items" }));
+      expect(runRows()).toHaveLength(5);
+    });
+
+    it("keeps Vitals, Currency and Faction together when there are no runs", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 0, truncated: false, runs: [] });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
+      vi.mocked(playersApi.currency).mockResolvedValue({ capabilities: {}, rows: [{ currency_id: 1, balance: 37641, label: "Solari Credit" }] });
+      const { container } = render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Vitals")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText("Currency")).toBeInTheDocument());
+      expect(container.querySelector(".summary-dungeons")).toBeNull();
+      const cards = container.querySelectorAll(".summary-overview > .summary-card");
+      expect([...cards].map((card) => card.querySelector(".summary-block-label")?.textContent)).toEqual(["Vitals", "Currency", "Faction"]);
+    });
+
+    it("keeps Vitals and Faction together when the dungeon card is shown", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 1, truncated: false,
+        runs: [{ completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 1, party }]
+      });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 150, maxHealth: 150, maxHealthEstimated: false, hydration: 85, maxHydration: 100, spiceAddictionLevel: 0, maxSpiceAddictionLevel: 10 });
+      const { container } = render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(container.querySelector(".summary-dungeons")).not.toBeNull());
+      await waitFor(() => expect(container.querySelector(".summary-overview")).toHaveTextContent("Vitals"));
+      expect(container.querySelector(".summary-overview")).toHaveTextContent("Faction");
+    });
+
+    it("notes truncation when only the latest runs were returned", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({
+        capabilities: { dungeons: true }, totalRuns: 501, truncated: true,
+        runs: [{ completionId: 9, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 1, party }]
+      });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(screen.getByText("Showing the latest 1 runs.")).toBeInTheDocument());
+    });
+
+    it("hides the block when the schema has no dungeon tables", async () => {
+      vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: false }, reason: "Unsupported" });
+      render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
+      await waitFor(() => expect(playersApi.dungeons).toHaveBeenCalledWith("91"));
+      expect(screen.queryByText("Dungeon Runs")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Vitals", () => {
     it("renders Health, Hydration, and Spice Addiction when vitals are supported", async () => {
       vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, maxHealthEstimated: true, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
@@ -565,7 +695,7 @@ describe("PlayerSummary", () => {
       );
       await waitFor(() => {
         expect(screen.getByText("Health")).toBeInTheDocument();
-        expect(screen.getByText("175 / 205 (estimated max)")).toBeInTheDocument();
+        expect(screen.getByText("175 / 205 (Estimated Max)")).toBeInTheDocument();
         expect(screen.getByText("Hydration")).toBeInTheDocument();
         expect(screen.getByText("84 / 100")).toBeInTheDocument();
         expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
@@ -605,11 +735,11 @@ describe("PlayerSummary", () => {
       );
       await act(async () => { await Promise.resolve(); });
       expect(playersApi.vitals).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("175 / 205 (estimated max)")).toBeInTheDocument();
+      expect(screen.getByText("175 / 205 (Estimated Max)")).toBeInTheDocument();
 
       await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
       expect(playersApi.vitals).toHaveBeenCalledTimes(2);
-      expect(screen.getByText("140 / 205 (estimated max)")).toBeInTheDocument();
+      expect(screen.getByText("140 / 205 (Estimated Max)")).toBeInTheDocument();
       expect(screen.getByText("61 / 100")).toBeInTheDocument();
 
       unmount();

@@ -1,6 +1,15 @@
 import { api, post } from "./client";
 import type { Task } from "./setup";
 
+export type DungeonRun = {
+  completionId: number;
+  dungeonId: string;
+  difficulty: number;
+  durationMs: number;
+  playerCount: number;
+  party: { controllerId: number; actorId: number | null; characterName: string | null }[];
+};
+
 type PlayersListResult = { rows: Record<string, unknown>[]; totalCount: number; totalPlayers: number; capabilities: Record<string, unknown>; reason?: string };
 
 export type PlayerListSettings = {
@@ -59,6 +68,7 @@ export const playersApi = {
   specs: (playerId: string) => api<{ rows: Record<string, unknown>[]; skillModules?: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specs`),
   position: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/position`),
   progression: (playerId: string) => api<{ level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/progression`),
+  dungeons: (playerId: string) => api<{ runs?: DungeonRun[]; totalRuns?: number; truncated?: boolean; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/dungeons`),
   vitals: (playerId: string) => api<{ currentHealth?: number | null; maxHealth?: number; maxHealthEstimated?: boolean; hydration?: number | null; maxHydration?: number; spiceAddictionLevel?: number | null; maxSpiceAddictionLevel?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/vitals`),
   events: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/events`),
   stats: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/stats`),
@@ -100,9 +110,9 @@ export const playersApi = {
   grantBuildingUnlock: (playerId: string, body: { itemId: string; confirmation: string }) => post<{ ok: boolean; status: string; deliveryVerified?: boolean; ownershipVerified?: boolean; alreadyOwned?: boolean; alreadyPending?: boolean; item?: Record<string, unknown>; result?: Record<string, unknown> }>(`/api/players/${encodeURIComponent(playerId)}/building-unlocks/grant`, body),
   customizations: (playerId: string) => api<{ rows: Record<string, unknown>[]; groups: { id: string; name: string; count: number }[]; capabilities: Record<string, unknown> }>(`/api/players/${encodeURIComponent(playerId)}/customizations`, { cache: "no-store" }),
   grantCustomizations: (playerId: string, body: { itemId?: string; groupId?: string; confirmation: string }) => post<{ ok: boolean; delivered?: number; unlocked?: number; granted: number; requested: number; skipped: number; failed: number; ownershipVerified?: boolean; results: Record<string, unknown>[] }>(`/api/players/${encodeURIComponent(playerId)}/customizations/grant`, body),
-  journey: (playerId: string) => api<{ rows: Record<string, unknown>; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey`),
-  completeJourneyNode: (playerId: string, body: { nodeId: string; confirmation: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey/complete`, body),
-  resetJourneyNode: (playerId: string, body: { nodeId: string; confirmation: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey/reset`, body),
+  journey: (playerId: string) => api<{ rows: Record<string, unknown>; capabilities: Record<string, unknown>; unverifiedBuild?: string | null; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey`),
+  completeJourneyNode: (playerId: string, body: { nodeId: string; confirmation: string; confirmedBuild?: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey/complete`, body),
+  resetJourneyNode: (playerId: string, body: { nodeId: string; confirmation: string; confirmedBuild?: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/journey/reset`, body),
   completeTutorial: (playerId: string, body: { tutorialId: string; confirmation: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/tutorials/complete`, body),
   resetTutorial: (playerId: string, body: { tutorialId: string; confirmation: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/tutorials/reset`, body),
   repairGear: (playerId: string, confirmation: string) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/repair-gear`, { confirmation }),

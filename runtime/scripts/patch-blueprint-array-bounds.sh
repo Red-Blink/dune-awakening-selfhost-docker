@@ -14,7 +14,7 @@ if ! docker inspect -f '{{.State.Running}}' dune-postgres 2>/dev/null | grep -qx
   exit 1
 fi
 
-echo "Ensuring Console-imported blueprints use the verified Patch 1.5 format..."
+echo "Checking Console-imported blueprint array bounds..."
 docker exec -i dune-postgres psql \
   -h 127.0.0.1 \
   -p 5432 \

@@ -819,7 +819,7 @@ normalize_faction_name() {
 
 specialization_apply_sql() {
   local actor_id="$1" account_id="$2" level="$3" xp="$4" tracks_csv="$5" grant_keystones="$6" unlock_faction="$7"
-  local track_array keystone_sql faction_sql unlock_faction_sql journey_id_column journey_id_value
+  local track_array keystone_sql faction_sql unlock_faction_sql journey_id_column journey_id_value faction_nodes
 
   track_array="$(specialization_track_sql_array "$tracks_csv")"
   unlock_faction_sql="${unlock_faction//\'/\'\'}"
@@ -852,7 +852,7 @@ specialization_apply_sql() {
       exit 1
     fi
     if [ "$journey_id_column" = "character_id" ]; then
-      journey_id_value="$(psql_admin -At -v ON_ERROR_STOP=1 -c "select id from dune.player_state where account_id = $account_id::bigint limit 1;" | tr -d '\r[:space:]')"
+      journey_id_value="$(psql_admin -At -v ON_ERROR_STOP=1 -c "select id from dune.player_state where account_id = $account_id::bigint and player_pawn_id = $actor_id::bigint;" | tr -d '\r[:space:]')"
       if [ -z "$journey_id_value" ]; then
         echo "Cannot unlock faction journey because no player_state row was found for account_id $account_id." >&2
         exit 1
@@ -860,6 +860,18 @@ specialization_apply_sql() {
     else
       journey_id_value="$account_id"
     fi
+    faction_nodes="$(python3 - <<'PY'
+import json
+from pathlib import Path
+cards = json.loads(Path("console/api/src/duneDb/journey-cards.json").read_text())
+root = "DA_FQ_ClimbTheRanks"
+selected = root + ".JoinAHouse"
+nodes = [selected]
+for node in nodes:
+    nodes.extend(cards[node].get("c", []))
+print(json.dumps({"selected": nodes, "siblings": cards[root]["c"]}).replace("'", "''"))
+PY
+)"
     faction_sql="
       insert into dune.player_faction (actor_id, faction_id, utc_time_faction_change)
       select $actor_id::bigint, f.id, now()
@@ -875,13 +887,27 @@ specialization_apply_sql() {
       on conflict (actor_id, faction_id)
       do nothing;
 
-      update dune.journey_story_node
+      insert into dune.journey_story_node
+        ($journey_id_column, story_node_id, complete_condition_state, reveal_condition_state,
+         has_pending_reward, fail_condition_state, metadata_state, reset_group)
+      select $journey_id_value::bigint, node, 'true', 'true', false, '{}', '{}', 'Default'
+      from jsonb_array_elements_text('$faction_nodes'::jsonb->'selected') as selected(node)
+      on conflict ($journey_id_column, story_node_id) do update
       set complete_condition_state = 'true'::jsonb,
           reveal_condition_state = 'true'::jsonb,
           has_pending_reward = false,
-          fail_condition_state = '{}'::jsonb
-      where $journey_id_column = $journey_id_value::bigint
-        and story_node_id like 'DA_FQ_ClimbTheRanks.JoinAHouse%';
+          fail_condition_state = '{}'::jsonb;
+
+      insert into dune.journey_story_node
+        ($journey_id_column, story_node_id, complete_condition_state, reveal_condition_state,
+         has_pending_reward, fail_condition_state, metadata_state, reset_group)
+      select $journey_id_value::bigint, 'DA_FQ_ClimbTheRanks', 'true', '{}', false, '{}', '{}', 'Default'
+      where not exists (
+        select 1 from jsonb_array_elements_text('$faction_nodes'::jsonb->'siblings') as sibling(node)
+        where not exists (select 1 from dune.journey_story_node j
+          where j.$journey_id_column = $journey_id_value::bigint and j.story_node_id = sibling.node
+            and j.complete_condition_state = 'true'::jsonb))
+      on conflict ($journey_id_column, story_node_id) do update set complete_condition_state = 'true'::jsonb;
     "
   fi
 

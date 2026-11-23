@@ -859,6 +859,21 @@ function scheduleBootAutoStart() {
   }, 5000).unref?.();
 }
 
+// Dedicated server Steam build paired with the card export's Windows build
+// 26592269. The two Steam apps have different build IDs for NetCL 2181988.
+async function unverifiedJourneyBuild() {
+  const build = await readSteamBuildId({ repoRoot: config.repoRoot });
+  return build && build !== "26591491" ? build : null;
+}
+
+async function editPlayerJourney(playerId, body, edit) {
+  const build = await unverifiedJourneyBuild();
+  if (build && body.confirmedBuild !== build) {
+    throw new Error(`The journey catalog has not been verified for server build ${build}. Reload the Journey tab and confirm this build before applying the change.`);
+  }
+  return edit(db, playerId, body, journeyTagsData);
+}
+
 let journeyTagsDataCache = null;
 function loadJourneyTagsData() {
   const file = join(config.repoRoot, "runtime", "data", "journey-tags.json");
@@ -2028,6 +2043,37 @@ async function handleApi(req, res) {
       onlyGuildId: scope ? scope.guildId : null
     }));
   }
+  if ((path === "/api/dungeons/runs" || path === "/api/dungeons/leaderboard") && req.method === "GET") {
+    // Own-record scoping (Red-Blink PR #202 review, same rule as /api/players
+    // above): dungeon runs/leaderboard are server-wide and list every party
+    // member, but the default `player` tier holds players:read. A player-tier
+    // session is forced onto its OWN player id, ignoring any client-supplied
+    // playerId; an unlinked or unresolvable player gets nothing, never the roster.
+    let playerId = url.searchParams.get("playerId") ?? "";
+    if (session.tier === "player") {
+      const scope = await resolveOwnPlayerScope(session.userId);
+      const notLinked = { notLinked: true, reason: PLAYER_LINK_INSTRUCTIONS.reason, linkInstructions: PLAYER_LINK_INSTRUCTIONS };
+      if (!scope.linked) return json(res, 200, path === "/api/dungeons/runs"
+        ? { capabilities: { dungeons: true }, totalCount: 0, totalRuns: 0, runs: [], ...notLinked }
+        : { capabilities: { dungeons: true }, entries: [], ...notLinked });
+      const own = await duneDb.listPlayers(db, { onlyPlayerControllerId: scope.playerControllerId, pageSize: 1, includeTotals: false });
+      const ownPlayerId = own.rows[0]?.action_player_id;
+      if (!ownPlayerId) return json(res, 403, { error: "You can only view your own player data." });
+      playerId = ownPlayerId;
+    }
+    if (path === "/api/dungeons/runs") return dbJson(res, () => duneDb.listDungeonRuns(db, {
+      page: url.searchParams.get("page") || 0,
+      pageSize: url.searchParams.get("pageSize") || 50,
+      dungeonId: url.searchParams.get("dungeonId") || "",
+      difficulty: url.searchParams.get("difficulty") ?? "",
+      playerId
+    }));
+    return dbJson(res, () => duneDb.dungeonLeaderboard(db, {
+      dungeonId: url.searchParams.get("dungeonId") || "",
+      difficulty: url.searchParams.get("difficulty") ?? "",
+      playerId
+    }));
+  }
   if (path.match(/^\/api\/guilds\/[^/]+\/members\/[^/]+\/promote$/) && req.method === "POST") return guildPromoteRoute(req, res, path);
   if (path.match(/^\/api\/guilds\/[^/]+\/members\/[^/]+\/demote$/) && req.method === "POST") return guildDemoteRoute(req, res, path);
   if (path.match(/^\/api\/guilds\/[^/]+\/members$/) && req.method === "POST") return guildAddMemberRoute(req, res, path);
@@ -2199,8 +2245,8 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/specializations\/keystones\/reset-all$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.specializations.keystones.reset-all", "RESET ALL KEYSTONES", (playerId) => duneDb.resetAllSpecializationKeystones(db, playerId));
   if (path.match(/^\/api\/players\/[^/]+\/crafting-recipes\/unlock$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.crafting-recipes.unlock", "UNLOCK CRAFTING RECIPE", (playerId, body) => duneDb.unlockCraftingRecipe(db, playerId, body));
   if (path.match(/^\/api\/players\/[^/]+\/research-items\/unlock$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.research-items.unlock", "UNLOCK RESEARCH ITEM", (playerId, body) => duneDb.unlockResearchItem(db, playerId, body));
-  if (path.match(/^\/api\/players\/[^/]+\/journey\/complete$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.journey.complete", "COMPLETE JOURNEY NODE", (playerId, body) => duneDb.completeJourneyNode(db, playerId, body, journeyTagsData));
-  if (path.match(/^\/api\/players\/[^/]+\/journey\/reset$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.journey.reset", "RESET JOURNEY NODE", (playerId, body) => duneDb.resetJourneyNode(db, playerId, body, journeyTagsData));
+  if (path.match(/^\/api\/players\/[^/]+\/journey\/complete$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.journey.complete", "COMPLETE JOURNEY NODE", (playerId, body) => editPlayerJourney(playerId, body, duneDb.completeJourneyNode));
+  if (path.match(/^\/api\/players\/[^/]+\/journey\/reset$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.journey.reset", "RESET JOURNEY NODE", (playerId, body) => editPlayerJourney(playerId, body, duneDb.resetJourneyNode));
   if (path.match(/^\/api\/players\/[^/]+\/tutorials\/complete$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.tutorials.complete", "COMPLETE TUTORIAL", (playerId, body) => duneDb.completeTutorial(db, playerId, body));
   if (path.match(/^\/api\/players\/[^/]+\/tutorials\/reset$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.tutorials.reset", "RESET TUTORIAL", (playerId, body) => duneDb.resetTutorial(db, playerId, body));
   if (path.match(/^\/api\/players\/[^/]+\/repair-gear$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.repair-gear", "REPAIR GEAR", (playerId) => duneDb.repairGear(db, playerId));
@@ -2220,7 +2266,9 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/research-items$/)) return dbPlayerRoute(req, res, path, duneDb.playerResearchItems);
   if (path.match(/^\/api\/players\/[^/]+\/building-unlocks$/) && req.method === "GET") return buildingUnlocksRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/customizations$/) && req.method === "GET") return customizationGrantsRoute(req, res, path);
-  if (path.match(/^\/api\/players\/[^/]+\/journey$/)) return dbPlayerRoute(req, res, path, (database, playerId) => duneDb.playerJourney(database, playerId, journeyTagsData));
+  if (path.match(/^\/api\/players\/[^/]+\/journey$/)) return dbPlayerRoute(req, res, path, async (database, playerId) => ({
+    ...await duneDb.playerJourney(database, playerId, journeyTagsData), unverifiedBuild: await unverifiedJourneyBuild()
+  }));
   if (path.match(/^\/api\/players\/[^/]+\/inventory$/)) return dbPlayerRoute(req, res, path, duneDb.playerInventoryAll);
   if (path.match(/^\/api\/players\/[^/]+\/vehicles$/) && req.method === "GET") return dbPlayerRoute(req, res, path, async (database, playerId) => ownedViewForSession(session, await duneDb.listVehicles(database, { playerId, pageSize: 200, access: effectiveAccess(session, playerAccessParam(url)) })));
   if (path.match(/^\/api\/players\/[^/]+\/bases$/) && req.method === "GET") return dbPlayerRoute(req, res, path, async (database, playerId) => ownedViewForSession(session, await duneDb.listBases(database, {
@@ -2246,6 +2294,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/position$/)) return dbPlayerRoute(req, res, path, duneDb.playerPosition);
   if (path.match(/^\/api\/players\/[^/]+\/progression$/)) return dbPlayerRoute(req, res, path, duneDb.playerProgression);
   if (path.match(/^\/api\/players\/[^/]+\/vitals$/)) return dbPlayerRoute(req, res, path, duneDb.playerVitals);
+  if (path.match(/^\/api\/players\/[^/]+\/dungeons$/) && req.method === "GET") return dbPlayerRoute(req, res, path, duneDb.playerDungeons);
   if (path.match(/^\/api\/players\/[^/]+\/events$/)) return dbPlayerUnsupported(req, res, path, "events");
   if (path.match(/^\/api\/players\/[^/]+\/stats$/)) return dbPlayerUnsupported(req, res, path, "stats");
   if (path.match(/^\/api\/players\/[^/]+\/history$/)) return dbPlayerUnsupported(req, res, path, "history");

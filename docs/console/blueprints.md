@@ -8,6 +8,11 @@ The Blueprints feature allows server admins to import, export, list, and delete
 player building blueprints through the admin console. Blueprints are stored as
 `BuildingBlueprint_CopyDevice` solido items in the player's backpack inventory.
 
+Database updates preserve equipment rotations already stored on blueprint
+items. If a legacy import already has tilted equipment, install a fresh item
+from the original blueprint file. Reimporting does not move projections
+already placed in the world.
+
 ## Architecture
 
 ```
@@ -417,7 +422,7 @@ Covers A01-A10 static analysis checks for the blueprint API surface.
 - **Finding**: Game server crashes (P34) when previewing some imported blueprints in-game
 - **Fixed**: `PlayerBaseBackupId` added to stats JSON to match live solido format
 - **Fixed**: Console imports retain the ordinary PostgreSQL array bounds verified before v1.4.26; the database-update repair targets only Console-owned imports and never rewrites native Funcom Blueprint rows
-- **Fixed**: Patch 1.5 placeables are stored as `X,Y,Z,Yaw,Pitch,Roll`; import/export now converts that order to and from the Solido JSON `rx,ry,rz` axes, and the database-update repair corrects older Console imports once without touching native Funcom rows
+- **Fixed**: The game projects equipment using `X,Y,Z,Pitch,Yaw,Roll`. New Console imports store the Solido JSON `rx,ry,rz` angles in that order. The Console records the layout alongside each new import so exporting it preserves the same angles. Older and native rows retain their existing export behavior. To replace an affected Solido, export and reimport it, or import the original file again. Existing projections stay at their saved positions and angles.
 - **Verification needed**: Test with different blueprints and map types
 - **Remaining root cause candidates**: hologram flag interaction, `building_blueprint_map` empty, invalid building types on target map
 

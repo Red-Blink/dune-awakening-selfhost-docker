@@ -22,7 +22,7 @@ import {
   supportsGeneratorRefillQueue
 } from "../src/duneDb.js";
 import { BASE_REFILL_BACKED_UP_MESSAGE, deleteBaseCompletely } from "../src/duneDb.js";
-import { addBaseContainerItem, addCurrency, addFactionReputation, addGuildMember, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addonPlayerIdentities, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, baseContainerSlots, baseGeneratorFuelLevels, baseGenerators, baseIsBackedUp, changeDunePassword, completeJourneyNode, completeTutorial, dbStatus, deleteAllBaseContainerItems, deleteBaseContainerItem, deleteInventoryItem, deleteMultipleBaseContainerItems, demoteGuildMember, disbandGuild, exportBaseAsBlueprint, fillItemToBaseContainer, fillItemToStorage, generatorUptimePolicy, giveItemToBaseContainer, giveItemToPlayer, giveItemToStorage, giveMultipleItemsToBaseContainer, guildMembers, inspectDeletedCharacterRecovery, inspectLandsraadQuestRepairs, landsraadOverview, listBases, listGuilds, listPlayers, listRoutines, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerBuildingUnlockState, playerCraftingRecipes, playerCurrency, playerCustomizationGrantState, playerFactions, playerIntel, playerInventory, playerInventoryAll, playerJourney, playerPortalSnapshots, playerPosition, playerProfile, playerProgression, playerResearchItems, playerServerMemberships, playerSolarisCoinTotal, playerTeleportDestinations, playerVitals, portalGeneratorFuel, portalVehicles, promoteGuildMember, recoverDeletedCharacter, refillBaseGenerators, removeGuildMember, repairFactionReputation, repairLandsraadQuests, repairVehicleDecay, resetJourneyNode, resetTutorial, resolvePlayerTarget, routineDefinition, runSql, setLandsraadPlayerContribution, setPlayerFaction, supportsGeneratorRefill, tablePreview, teleportOfflinePlayerToCoords, teleportPlayer, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
+import { addBaseContainerItem, addCurrency, addFactionReputation, addGuildMember, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addonPlayerIdentities, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, baseContainerSlots, baseGeneratorFuelLevels, baseGenerators, baseIsBackedUp, changeDunePassword, completeJourneyNode, completeTutorial, dbStatus, dungeonLeaderboard, deleteAllBaseContainerItems, deleteBaseContainerItem, deleteInventoryItem, deleteMultipleBaseContainerItems, demoteGuildMember, disbandGuild, exportBaseAsBlueprint, fillItemToBaseContainer, fillItemToStorage, generatorUptimePolicy, giveItemToBaseContainer, giveItemToPlayer, giveItemToStorage, giveMultipleItemsToBaseContainer, guildMembers, inspectDeletedCharacterRecovery, inspectLandsraadQuestRepairs, landsraadOverview, listBases, listDungeonRuns, listGuilds, listPlayers, listRoutines, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerBuildingUnlockState, playerCraftingRecipes, playerCurrency, playerCustomizationGrantState, playerDungeons, playerFactions, playerIntel, playerInventory, playerInventoryAll, playerJourney, playerPortalSnapshots, playerPosition, playerProfile, playerProgression, playerResearchItems, playerServerMemberships, playerSolarisCoinTotal, playerTeleportDestinations, playerVitals, portalGeneratorFuel, portalVehicles, promoteGuildMember, recoverDeletedCharacter, refillBaseGenerators, removeGuildMember, repairFactionReputation, repairLandsraadQuests, repairVehicleDecay, resetJourneyNode, resetTutorial, resolvePlayerTarget, routineDefinition, runSql, setLandsraadPlayerContribution, setPlayerFaction, supportsGeneratorRefill, tablePreview, teleportOfflinePlayerToCoords, teleportPlayer, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
 import { listStorage, liveMapBases, liveMapStorage, liveMapVehicles, portalStorage, trackPlayerPlaytime } from "../src/duneDb.js";
 
 beforeEach(() => {
@@ -1500,6 +1500,166 @@ test("player vitals reports unsupported when required addon tables/columns are m
   };
   const result = await playerVitals(db, "91");
   assert.equal(result.capabilities.vitals, false);
+});
+
+function dungeonDb({ runs = [], total = runs.length } = {}) {
+  return {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.dungeon_completion_players me")) {
+        assert.deepEqual(values, [301]);
+        return { rows: runs };
+      }
+      if (text.includes("count(*)::int as total from dune.dungeon_completion_players")) {
+        assert.deepEqual(values, [301]);
+        return { rows: [{ total }] };
+      }
+      return { rows: [] };
+    }
+  };
+}
+
+test("player dungeons lists runs keyed on the controller id with party names", async () => {
+  const db = dungeonDb({ runs: [{
+    completion_id: "4", dungeon_id: "DA_Dgn_089_Radiation", difficulty: 2, duration_ms: 992717, players_num: 2,
+    party: [{ controllerId: 301, actorId: "91", characterName: "Aster" }, { controllerId: 36, actorId: null, characterName: null }]
+  }] });
+  const result = await playerDungeons(db, "91");
+  assert.equal(result.capabilities.dungeons, true);
+  assert.equal(result.totalRuns, 1);
+  assert.equal(result.truncated, false);
+  assert.deepEqual(result.runs, [{
+    completionId: 4, dungeonId: "DA_Dgn_089_Radiation", difficulty: 2, durationMs: 992717, playerCount: 2,
+    party: [{ controllerId: 301, actorId: 91, characterName: "Aster" }, { controllerId: 36, actorId: null, characterName: null }]
+  }]);
+});
+
+test("player dungeons returns an empty list for a player with no runs", async () => {
+  const result = await playerDungeons(dungeonDb(), "91");
+  assert.equal(result.capabilities.dungeons, true);
+  assert.deepEqual(result.runs, []);
+  assert.equal(result.totalRuns, 0);
+  assert.equal(result.truncated, false);
+});
+
+test("player dungeons flags truncation when the total exceeds the returned runs", async () => {
+  const db = dungeonDb({ runs: [{ completion_id: 9, dungeon_id: "DA_Dgn_024_Darkness", difficulty: 1, duration_ms: 1, players_num: 1, party: [] }], total: 501 });
+  const result = await playerDungeons(db, "91");
+  assert.equal(result.totalRuns, 501);
+  assert.equal(result.truncated, true);
+});
+
+test("player dungeons returns no runs without querying when the player has no controller", async () => {
+  const queries = [];
+  const db = {
+    query: async (text) => {
+      queries.push(text);
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 0, player_state_id: 1, online_status: "Offline" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerDungeons(db, "91");
+  assert.deepEqual(result.runs, []);
+  assert.equal(result.totalRuns, 0);
+  assert.equal(queries.some((text) => text.includes("dungeon_completion_players me")), false);
+});
+
+test("player dungeons reports unsupported when the completion tables are missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerDungeons(db, "91");
+  assert.equal(result.capabilities.dungeons, false);
+});
+
+function serverDungeonDb({ pagedRows = [], totalRuns = 0, leaderboardRows = [], controllerId = 301 } = {}) {
+  const calls = [];
+  return {
+    calls,
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: controllerId, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("total_runs from dune.dungeon_completion")) return { rows: [{ total_runs: totalRuns }] };
+      if (text.includes("with matched as")) return { rows: pagedRows };
+      if (text.includes("with ranked as")) return { rows: leaderboardRows };
+      return { rows: [] };
+    }
+  };
+}
+
+const partyRow = (completionId, overrides = {}) => ({
+  completion_id: String(completionId), dungeon_id: "DA_Dgn_089_Radiation", difficulty: 2, duration_ms: 992717, players_num: 1,
+  party: [{ controllerId: 23, actorId: 25, characterName: "Aster" }], ...overrides
+});
+
+test("listDungeonRuns pages server-wide runs with filtered and unfiltered totals", async () => {
+  const db = serverDungeonDb({ pagedRows: [{ ...partyRow(4), total_count: 3 }, { ...partyRow(3), total_count: 3 }], totalRuns: 4 });
+  const result = await listDungeonRuns(db, { page: "0", pageSize: "2" });
+  assert.equal(result.capabilities.dungeons, true);
+  assert.equal(result.totalCount, 3);
+  assert.equal(result.totalRuns, 4);
+  assert.deepEqual(result.runs.map((run) => run.completionId), [4, 3]);
+  assert.deepEqual(result.runs[0].party, [{ controllerId: 23, actorId: 25, characterName: "Aster" }]);
+  const paged = db.calls.find((call) => call.text.includes("with matched as"));
+  assert.match(paged.text, /where true/);
+  assert.deepEqual(paged.values, [2, 0]);
+});
+
+test("listDungeonRuns keeps the total on a page past the end", async () => {
+  const db = serverDungeonDb({ pagedRows: [{ completion_id: null, total_count: 4 }], totalRuns: 4 });
+  const result = await listDungeonRuns(db, { page: "10", pageSize: "2" });
+  assert.deepEqual(result.runs, []);
+  assert.equal(result.totalCount, 4);
+});
+
+test("listDungeonRuns binds dungeon, difficulty and the player's controller id as filters", async () => {
+  const db = serverDungeonDb({ pagedRows: [] });
+  await listDungeonRuns(db, { dungeonId: " DA_Dgn_089_Radiation ", difficulty: "2", playerId: "91", page: 1, pageSize: 25 });
+  const paged = db.calls.find((call) => call.text.includes("with matched as"));
+  assert.match(paged.text, /dc\.dungeon_id = \$1 and dc\.difficulty = \$2 and exists \(.*f\.player_id = \$3::bigint\)/s);
+  assert.deepEqual(paged.values, ["DA_Dgn_089_Radiation", 2, 301, 25, 25]);
+});
+
+test("listDungeonRuns rejects out-of-range paging and returns nothing for a controller-less player", async () => {
+  await assert.rejects(() => listDungeonRuns(serverDungeonDb(), { pageSize: "501" }));
+  await assert.rejects(() => listDungeonRuns(serverDungeonDb(), { difficulty: "hard" }));
+  const db = serverDungeonDb({ controllerId: 0, totalRuns: 4 });
+  const result = await listDungeonRuns(db, { playerId: "91" });
+  assert.deepEqual(result.runs, []);
+  assert.equal(result.totalCount, 0);
+  assert.equal(result.totalRuns, 4);
+  assert.equal(db.calls.some((call) => call.text.includes("with matched as")), false);
+});
+
+test("dungeonLeaderboard returns the best run and run count per dungeon and difficulty", async () => {
+  const db = serverDungeonDb({ leaderboardRows: [{ ...partyRow(2, { dungeon_id: "DA_Dgn_136_Fire", duration_ms: 872671, players_num: 2 }), run_count: 5 }] });
+  const result = await dungeonLeaderboard(db, { difficulty: "2" });
+  assert.deepEqual(result.entries, [{
+    runCount: 5,
+    best: { completionId: 2, dungeonId: "DA_Dgn_136_Fire", difficulty: 2, durationMs: 872671, playerCount: 2, party: [{ controllerId: 23, actorId: 25, characterName: "Aster" }] }
+  }]);
+  const query = db.calls.find((call) => call.text.includes("with ranked as"));
+  assert.match(query.text, /distinct on \(dc\.dungeon_id, dc\.difficulty\)/);
+  assert.match(query.text, /order by dc\.dungeon_id, dc\.difficulty, dc\.duration_ms asc, dc\.completion_id asc/);
+  assert.deepEqual(query.values, [2]);
+});
+
+test("server-wide dungeon routes report unsupported when the completion tables are missing", async () => {
+  const db = { query: async (text) => (text.includes("to_regclass") ? { rows: [{ exists: false }] } : { rows: [] }) };
+  assert.equal((await listDungeonRuns(db)).capabilities.dungeons, false);
+  assert.equal((await dungeonLeaderboard(db)).capabilities.dungeons, false);
 });
 
 test("player vitals reports null (not zero) health/hydration/spice when no matching data exists", async () => {
@@ -8338,16 +8498,15 @@ test("journey completion updates the selected subtree without completing ancesto
   assert.ok(calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Story.Child")));
 });
 
-test("Find the Fremen completion grants its extra tag, TechKnowledge rewards, and Spice Vision", async () => {
+test("Find the Fremen grants the card schematics without forcing global Spice Vision or reward flags", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, { currentResearchItems: [] });
   const result = await completeJourneyNode(db, 123, { nodeId: "DA_MQ_FindTheFremen" }, {
     journey_node_tags: { "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.CompleteFirstTest": ["JourneySets.Fremkit.First"] }
   });
-  assert.equal(result.recipesGranted, 5);
-  assert.ok(calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Journey.RewardsUnblocked")));
-  assert.equal(calls.filter((call) => call.text.includes("TechKnowledgePlayerComponent,m_TechKnowledge,m_TechKnowledgeData") && call.text.includes("update dune.actors")).length, 5);
-  assert.ok(calls.some((call) => call.text.includes("FSpiceAddictionComponent,1,SystemStatus")));
+  assert.equal(result.recipesGranted, 8);
+  assert.ok(!calls.some((call) => call.text.includes("insert into dune.player_tags") && call.values[1].includes("Journey.RewardsUnblocked")));
+  assert.ok(!calls.some((call) => call.text.includes("FSpiceAddictionComponent,1,SystemStatus")));
 });
 
 test("contract completion applies skills, removes superseded tags, and dismisses its active item", async () => {
