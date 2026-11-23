@@ -541,8 +541,8 @@ are read again, so a change takes effect at the next sign-in at the latest.
 * The console password sign-in is not affected.
 * The first start after updating signs existing Discord users out once, so they
   pick up the cap.
-* To remove someone immediately, restart the console (this ends every session) or
-  change the console password, then remove the role.
+* The cap is the longest a removed role can keep working. If that is too long for
+  you, set a shorter value (down to 5 minutes).
 
 ## Questions operators ask
 
