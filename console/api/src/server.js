@@ -2023,7 +2023,7 @@ async function handleApi(req, res) {
   }
   // Server-wide and party-revealing: a `player`-tier session never reaches these
   // (playerMayCall's allowlist in playerScope.js is deny-by-default and does not
-  // list /api/dungeons/*), so no own-record scoping is needed here.
+  // list the dungeons routes), so no own-record scoping is needed here.
   if (path === "/api/dungeons/runs" && req.method === "GET") return dbJson(res, () => duneDb.listDungeonRuns(db, {
     page: url.searchParams.get("page") || 0,
     pageSize: url.searchParams.get("pageSize") || 50,
