@@ -34,6 +34,17 @@ export function parseCookies(header = "") {
 export function createAuth(config) {
   const sessions = new Map();
   const now = config.now || (() => Date.now());
+
+  // Finding #1355: a Discord-derived session (userId set) carries a tier that was
+  // resolved ONCE at sign-in, and the idle expiry slides on every request, so a
+  // role removed or a member who left the guild would keep that tier forever. An
+  // ABSOLUTE expiry (never extended by activity) bounds that lag: after it, the
+  // user signs in again and the roles are re-resolved from Discord. 0 disables it.
+  const DISCORD_SESSION_MAX_AGE_MS = Math.max(0, Number(config.discordSessionMaxAgeMs ?? 60 * 60 * 1000) || 0);
+  function absoluteExpiryFor(userId, scope) {
+    return userId && !scope && DISCORD_SESSION_MAX_AGE_MS > 0 ? now() + DISCORD_SESSION_MAX_AGE_MS : null;
+  }
+  const pastAbsoluteExpiry = (session) => Number.isFinite(session.absoluteExpiresAt) && session.absoluteExpiresAt < now();
   const sessionStoreFile = config.sessionStoreFile ? String(config.sessionStoreFile) : "";
   let lastPersistAt = 0;
   let persistenceCredential, persistenceSecret, persistenceKey;
@@ -65,7 +76,7 @@ export function createAuth(config) {
       persistenceCredential = config.adminPassword;
       persistenceSecret = config.sessionSecret;
     }
-    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged), ...(entry.displayName ? [String(entry.displayName)] : [])])).digest("base64url");
+    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged), ...(entry.displayName ? [String(entry.displayName)] : []), ...(entry.absoluteExpiresAt ? ["abs", Number(entry.absoluteExpiresAt)] : [])])).digest("base64url");
   }
 
   function constantTimeStringEqual(left, right) {
@@ -86,6 +97,11 @@ export function createAuth(config) {
         const expiresAt = Number(entry.expiresAt);
         if (!Number.isFinite(expiresAt) || expiresAt < currentNow) continue;
         if (!entry.mac || !constantTimeStringEqual(sessionMac(entry), entry.mac)) continue;
+        // A Discord-derived session written before the absolute cap existed has no
+        // cap to enforce: drop it so the user re-signs in once and gets one (#1355).
+        const absoluteExpiresAt = Number(entry.absoluteExpiresAt);
+        if (entry.userId && DISCORD_SESSION_MAX_AGE_MS > 0 && !Number.isFinite(absoluteExpiresAt)) continue;
+        if (Number.isFinite(absoluteExpiresAt) && absoluteExpiresAt < currentNow) continue;
         sessions.set(entry.id, {
           id: entry.id,
           csrf: entry.csrf,
@@ -94,7 +110,8 @@ export function createAuth(config) {
           userId: entry.userId || "",
           username: entry.username || "",
           displayName: entry.displayName || entry.username || "",
-          guildId: entry.guildId || ""
+          guildId: entry.guildId || "",
+          ...(Number.isFinite(absoluteExpiresAt) ? { absoluteExpiresAt } : {})
         });
       }
     } catch {
@@ -110,7 +127,7 @@ export function createAuth(config) {
     try {
       const active = [];
       for (const [id, session] of sessions) {
-        if (!session || session.expiresAt < currentNow) {
+        if (!session || session.expiresAt < currentNow || pastAbsoluteExpiry(session)) {
           sessions.delete(id);
           continue;
         }
@@ -127,6 +144,7 @@ export function createAuth(config) {
           username: session.username || "",
           ...(session.displayName ? { displayName: session.displayName } : {}),
           guildId: session.guildId || "",
+          ...(session.absoluteExpiresAt ? { absoluteExpiresAt: session.absoluteExpiresAt } : {}),
           mac: sessionMac(session)
         });
       }
@@ -154,7 +172,8 @@ export function createAuth(config) {
     const id = randomBytes(32).toString("base64url");
     const csrf = randomBytes(24).toString("base64url");
     const expiresAt = now() + ttlMs;
-    const session = { id, csrf, expiresAt, tier, userId, username, displayName, guildId, scope, renewable, expectedFactorVersion };
+    const absoluteExpiresAt = absoluteExpiryFor(userId, scope);
+    const session = { id, csrf, expiresAt, tier, userId, username, displayName, guildId, scope, renewable, expectedFactorVersion, ...(absoluteExpiresAt ? { absoluteExpiresAt } : {}) };
     sessions.set(id, session);
     if (!scope) persistSessions(true);
     return { ...session, cookie: `${id}.${sign(id)}` };
@@ -167,7 +186,7 @@ export function createAuth(config) {
     const [id, sig] = raw.split(".");
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
-    if (!session || session.expiresAt < now()) {
+    if (!session || session.expiresAt < now() || pastAbsoluteExpiry(session)) {
       if (sessions.delete(id)) persistSessions(true);
       return null;
     }
@@ -181,7 +200,7 @@ export function createAuth(config) {
   // callback). Expiry is honored exactly as readSession does.
   function readSessionById(id) {
     const session = sessions.get(id);
-    if (!session || session.expiresAt < now()) return null;
+    if (!session || session.expiresAt < now() || pastAbsoluteExpiry(session)) return null;
     return session;
   }
 
@@ -202,7 +221,7 @@ export function createAuth(config) {
     const [id, sig] = raw.split(".");
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
-    return session && session.expiresAt >= now() ? session : null;
+    return session && session.expiresAt >= now() && !pastAbsoluteExpiry(session) ? session : null;
   }
 
   // Invalidate one session by id (enrollment completion, logout, rotation).
