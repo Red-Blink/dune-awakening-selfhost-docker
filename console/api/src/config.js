@@ -197,6 +197,16 @@ function readEnginePortsFromLegacyUsersettings(repoRoot) {
   };
 }
 
+// #1355: minutes -> ms. Unset = 60 minutes. "0" disables the cap. Anything else invalid
+// falls back to the default; a positive value below 5 is raised to 5 so a typo cannot
+// lock every Discord user out of a console they just signed in to.
+function sessionMaxAgeMs(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return 60 * 60 * 1000;
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes < 0) return 60 * 60 * 1000;
+  return minutes === 0 ? 0 : Math.max(5, minutes) * 60 * 1000;
+}
+
 function portValue(value, fallback) {
   const parsed = Number(value || fallback);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
@@ -312,6 +322,8 @@ export function loadConfig() {
     // docker-compose.web.yml's environment: passthrough doesn't (and
     // shouldn't) carry every operator-set game-server value.
     totpIssuer: APP_NAME,
+    // #1355: absolute cap on a Discord-derived session (roles re-resolved at the next sign-in). 0 = off.
+    discordSessionMaxAgeMs: sessionMaxAgeMs(process.env.DISCORD_SESSION_MAX_AGE_MINUTES),
     enrollmentSessionTtlMs: 10 * 60 * 1000, // §4: short-lived, non-renewable enrollment session
     adminPasswordEnvManaged,
     discordOAuthClientSecretEnvManaged,

@@ -526,6 +526,24 @@ has no two-factor enabled (and names the Discord setting to fix it).
   kick/ban/teleport unless you also add an explicit `Deny` on
   `players:moderate` and `players:teleport` to that tier.
 
+### How long a Discord sign-in lasts, and what happens when someone loses a role
+
+Roles are read from Discord once, when a person signs in. To make sure a removed
+role (or someone who left or was banned from your Discord server) cannot keep
+using the console, every Discord sign-in also has a **maximum age of 60 minutes
+that activity does not extend**. When it ends the person is sent back to sign in;
+for someone already signed in to Discord that is a quick redirect, and the roles
+are read again, so a change takes effect at the next sign-in at the latest.
+
+* Change it with `DISCORD_SESSION_MAX_AGE_MINUTES` in `.env` (default `60`,
+  minimum `5`, `0` turns the cap off so a session lasts until it has been idle for
+  12 hours).
+* The console password sign-in is not affected.
+* The first start after updating signs existing Discord users out once, so they
+  pick up the cap.
+* The cap is the longest a removed role can keep working. If that is too long for
+  you, set a shorter value (down to 5 minutes).
+
 ## Questions operators ask
 
 **Several people sign in to my console. Do they each get their own
