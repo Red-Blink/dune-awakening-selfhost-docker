@@ -2021,37 +2021,21 @@ async function handleApi(req, res) {
       onlyGuildId: scope ? scope.guildId : null
     }));
   }
-  if ((path === "/api/dungeons/runs" || path === "/api/dungeons/leaderboard") && req.method === "GET") {
-    // Own-record scoping (Red-Blink PR #202 review, same rule as /api/players
-    // above): dungeon runs/leaderboard are server-wide and list every party
-    // member, but the default `player` tier holds players:read. A player-tier
-    // session is forced onto its OWN player id, ignoring any client-supplied
-    // playerId; an unlinked or unresolvable player gets nothing, never the roster.
-    let playerId = url.searchParams.get("playerId") ?? "";
-    if (session.tier === "player") {
-      const scope = await resolveOwnPlayerScope(session.userId);
-      const notLinked = { notLinked: true, reason: PLAYER_LINK_INSTRUCTIONS.reason, linkInstructions: PLAYER_LINK_INSTRUCTIONS };
-      if (!scope.linked) return json(res, 200, path === "/api/dungeons/runs"
-        ? { capabilities: { dungeons: true }, totalCount: 0, totalRuns: 0, runs: [], ...notLinked }
-        : { capabilities: { dungeons: true }, entries: [], ...notLinked });
-      const own = await duneDb.listPlayers(db, { onlyPlayerControllerId: scope.playerControllerId, pageSize: 1, includeTotals: false });
-      const ownPlayerId = own.rows[0]?.action_player_id;
-      if (!ownPlayerId) return json(res, 403, { error: "You can only view your own player data." });
-      playerId = ownPlayerId;
-    }
-    if (path === "/api/dungeons/runs") return dbJson(res, () => duneDb.listDungeonRuns(db, {
-      page: url.searchParams.get("page") || 0,
-      pageSize: url.searchParams.get("pageSize") || 50,
-      dungeonId: url.searchParams.get("dungeonId") || "",
-      difficulty: url.searchParams.get("difficulty") ?? "",
-      playerId
-    }));
-    return dbJson(res, () => duneDb.dungeonLeaderboard(db, {
-      dungeonId: url.searchParams.get("dungeonId") || "",
-      difficulty: url.searchParams.get("difficulty") ?? "",
-      playerId
-    }));
-  }
+  // Server-wide and party-revealing: a `player`-tier session never reaches these
+  // (playerMayCall's allowlist in playerScope.js is deny-by-default and does not
+  // list /api/dungeons/*), so no own-record scoping is needed here.
+  if (path === "/api/dungeons/runs" && req.method === "GET") return dbJson(res, () => duneDb.listDungeonRuns(db, {
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50,
+    dungeonId: url.searchParams.get("dungeonId") || "",
+    difficulty: url.searchParams.get("difficulty") ?? "",
+    playerId: url.searchParams.get("playerId") ?? ""
+  }));
+  if (path === "/api/dungeons/leaderboard" && req.method === "GET") return dbJson(res, () => duneDb.dungeonLeaderboard(db, {
+    dungeonId: url.searchParams.get("dungeonId") || "",
+    difficulty: url.searchParams.get("difficulty") ?? "",
+    playerId: url.searchParams.get("playerId") ?? ""
+  }));
   if (path.match(/^\/api\/guilds\/[^/]+\/members\/[^/]+\/promote$/) && req.method === "POST") return guildPromoteRoute(req, res, path);
   if (path.match(/^\/api\/guilds\/[^/]+\/members\/[^/]+\/demote$/) && req.method === "POST") return guildDemoteRoute(req, res, path);
   if (path.match(/^\/api\/guilds\/[^/]+\/members$/) && req.method === "POST") return guildAddMemberRoute(req, res, path);
