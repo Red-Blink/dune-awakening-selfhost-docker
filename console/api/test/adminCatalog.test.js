@@ -155,6 +155,16 @@ test("mission placeables are searchable and resolve to their native building pat
   }
 });
 
+test("Call to Adventure appears once in Building Sets and resolves by name and patent ID", () => {
+  const name = "Mural: Call to Adventure";
+  const itemId = "MTX_Neut_MuralPainting_03_Patent";
+  const matches = listBuildingUnlockItems(REAL_REPO_ROOT).filter((row) => row.name === name);
+  assert.deepEqual(matches.map((row) => row.itemId), [itemId]);
+  assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemName: name }).itemId, itemId);
+  assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemId }).name, name);
+  assert.equal(matches[0].entitlementControlled, true);
+});
+
 test("real catalog exposes the verified Ixian Icon patent through building unlocks", () => {
   // The exact token is present in build 2160922's CDT_BaseItems. The item
   // listing names it Ixian Icon and links it to A Sign from Above:
