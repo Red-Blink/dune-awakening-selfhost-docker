@@ -62,7 +62,7 @@ export const PLAYER_ADMIN_SKILL_TREES: Record<string, { tree: string; cards: Ski
 };
 
 type StarterSkillPreset = { label: string; modules: { id: string; level: number }[] };
-type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
+type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; readOnly?: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
 type CurrencyOption = { id: number; label: string };
 
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
@@ -110,6 +110,18 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     { label: "Admin", icon: ShieldCheck }
   ];
   const [playerAdmin_activeTab, playerAdmin_setActiveTab] = useState("Character");
+  const [playerAdmin_teleportFocusKey, playerAdmin_setTeleportFocusKey] = useState(0);
+  const playerAdmin_teleportRef = useRef<HTMLDivElement>(null);
+  const playerAdmin_teleportScrollPending = useRef(false);
+  useEffect(() => {
+    if (!playerAdmin_teleportScrollPending.current || playerAdmin_activeTab !== "Admin") return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      if (!playerAdmin_teleportRef.current) return;
+      playerAdmin_teleportScrollPending.current = false;
+      playerAdmin_teleportRef.current.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [playerAdmin_activeTab, playerAdmin_teleportFocusKey]);
   const [playerAdmin_openToggles, playerAdmin_setOpenToggles] = useState<Record<string, boolean>>({ quick_rewards: true });
   const [playerAdmin_inventoryData, playerAdmin_setInventoryData] = useState<Record<string, unknown> | null>(null);
   const [playerAdmin_inventoryFilter, playerAdmin_setInventoryFilter] = useState("");
@@ -167,6 +179,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_journeyRows, playerAdmin_setJourneyRows] = useState<Record<string, JourneyRow[]>>({ story: [], contract: [], codex: [], tutorial: [] });
   const [playerAdmin_journeyLoading, playerAdmin_setJourneyLoading] = useState(false);
   const [playerAdmin_journeyError, playerAdmin_setJourneyError] = useState("");
+  const [unverifiedJourneyBuild, setUnverifiedJourneyBuild] = useState<string>();
   const [playerAdmin_journeyFilter, playerAdmin_setJourneyFilter] = useState("");
   const [playerAdmin_expandedJourney, playerAdmin_setExpandedJourney] = useState<Record<string, boolean>>({});
   const [playerAdmin_vehicleId, playerAdmin_setVehicleId] = useState("");
@@ -653,6 +666,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         dependency: String(row.dependency || row.parentId || ""),
         status: String(row.status || "Incomplete"),
         complete: Boolean(row.complete),
+        readOnly: Boolean(row.readOnly),
         revealed: Boolean(row.revealed),
         pendingReward: Boolean(row.pendingReward),
         tags: Number(row.tags || 0),
@@ -670,6 +684,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     playerAdmin_setJourneyError("");
     try {
       const response = await playersApi.journey(dbPlayerId);
+      setUnverifiedJourneyBuild(response.unverifiedBuild || undefined);
       playerAdmin_setJourneyRows(playerAdmin_mapJourneyRows(response.rows));
     } catch (error) {
       playerAdmin_setJourneyRows({ story: [], contract: [], codex: [], tutorial: [] });
@@ -691,20 +706,30 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       onError(error instanceof Error ? error.message : String(error));
     }
   }
+  async function confirmJourneyBuild(row: JourneyRow) {
+    if (row.category === "Tutorial" || !unverifiedJourneyBuild) return true;
+    return confirmAction(`The journey catalog was verified on server build 26591491. Your server is running build ${unverifiedJourneyBuild}, which may have different progression rules. Continue with this edit?`, {
+      title: "Unverified Game Build", confirmLabel: "Continue", danger: true
+    });
+  }
   async function playerAdmin_completeJourney(row: JourneyRow) {
     const key = `journey:${row.category}:${row.id}`;
     onError("");
-    if (!(await confirmAction(`Mark "${row.name}" complete for ${playerName}? The player must be fully offline; the change takes effect on the next login.`, {
+    const rewardNote = row.category === "Story" || row.category === "Contract"
+      ? " The Console updates progress and known unlocks. XP, Solaris and inventory items are excluded from this action."
+      : "";
+    if (!(await confirmAction(`Mark "${row.name}" complete for ${playerName}? The player must be offline. The change takes effect on the next login.${rewardNote}`, {
       title: "Complete Journey Node",
       confirmLabel: "Complete",
       details: [{ label: "Player", value: playerName, tone: "accent" }, { label: "Node", value: row.name }]
     }))) return;
+    if (!(await confirmJourneyBuild(row))) return;
     playerAdmin_showResult(key, `Completing ${row.name} for ${playerName}`, "neutral", true);
     try {
       const response = row.category === "Tutorial"
         ? await playersApi.completeTutorial(dbPlayerId, { tutorialId: row.id, confirmation: "COMPLETE TUTORIAL" })
-        : await playersApi.completeJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "COMPLETE JOURNEY NODE" });
-      const changed = Number(response.result?.updatedRows || response.result?.deletedRows || 1);
+        : await playersApi.completeJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "COMPLETE JOURNEY NODE", confirmedBuild: unverifiedJourneyBuild });
+      const changed = Number(response.result?.updatedRows ?? response.result?.deletedRows ?? 1);
       playerAdmin_showResult(key, `${row.name} was completed for ${playerName}.`, "success");
       playerAdmin_addLog(`Complete ${row.category}`, row.rawName || row.id, String(changed), "Succeeded");
       await playerAdmin_loadJourneyRows();
@@ -723,11 +748,12 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       danger: true,
       details: [{ label: "Player", value: playerName, tone: "accent" }, { label: "Node", value: row.name, tone: "danger" }]
     }))) return;
+    if (!(await confirmJourneyBuild(row))) return;
     playerAdmin_showResult(key, `Resetting ${row.name} for ${playerName}`, "neutral", true);
     try {
       const response = row.category === "Tutorial"
         ? await playersApi.resetTutorial(dbPlayerId, { tutorialId: row.id, confirmation: "RESET TUTORIAL" })
-        : await playersApi.resetJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "RESET JOURNEY NODE" });
+        : await playersApi.resetJourneyNode(dbPlayerId, { nodeId: row.id, confirmation: "RESET JOURNEY NODE", confirmedBuild: unverifiedJourneyBuild });
       const changed = Number(response.result?.updatedRows || response.result?.deletedRows || 0);
       playerAdmin_showResult(key, `${row.name} was reset for ${playerName}.`, "neutral");
       playerAdmin_addLog(`Reset ${row.category}`, row.rawName || row.id, String(changed), "Succeeded");
@@ -1123,7 +1149,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               <td className="playerAdmin_resultCell"><InlineActionResult result={playerAdmin_actionResult} resultKey={key} /></td>
               <td className="playerAdmin_actionCell">
                 <div className="playerAdmin_actionCellInner">
-                {journeyActionsAvailable(row.category) ? <>
+                {journeyActionsAvailable(row.category) && !row.readOnly ? <>
                   <button disabled={!dbPlayerId || row.complete || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_completeJourney(row)}>Complete</button>
                   <button disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_resetJourney(row)}>Reset</button>
                 </> : <span className="playerAdmin_note" title="The game manages related rewards, schematics, and tags.">Read-only</span>}
@@ -1158,10 +1184,29 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     });
   }
 
+  async function playerAdmin_kickPlayer() {
+    if (!(await confirmAction(`Kick ${playerName} from the server?`))) return;
+    void playerAdmin_runAction("adminKick", `Kicking ${playerName}`, () => playerAdmin_runTask(() => playersApi.kick(actionPlayerId)), `${playerName} was kicked from the server.`, { actionType: "Kick Player", target: playerName, amount: "1" }, "danger");
+  }
+
+  // Teleport needs a destination, so the summary's Teleport button opens the
+  // Admin tab's teleport controls rather than running anything itself.
+  function playerAdmin_openTeleport() {
+    playerAdmin_teleportScrollPending.current = true;
+    playerAdmin_setActiveTab("Admin");
+    playerAdmin_setTeleportFocusKey((key) => key + 1);
+  }
+
+  const playerAdmin_summaryActions = <>
+    <button type="button" onClick={playerAdmin_openTeleport}>Teleport</button>
+    <button type="button" className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_kickPlayer()}>Kick Player</button>
+    <InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" />
+  </>;
+
   return (
     <section className="playerAdmin_container" aria-label="Player admin layout">
       <div className="playerAdmin_header"><h3>Player Summary</h3><button onClick={onClose}>Close</button></div>
-      <PlayerSummary detail={detail} fallback={fallback} dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} refreshKey={playerAdmin_summaryRefreshKey} onRepairFactionReputation={playerAdmin_repairFactionReputation} factionRepairDisabled={!dbPlayerId || playerAdmin_isOnline} factionRepairResult={playerAdmin_actionResult?.key === "repairFactionReputation" ? playerAdmin_actionResult : null} />
+      <PlayerSummary detail={detail} fallback={fallback} dbPlayerId={dbPlayerId} actionPlayerId={actionPlayerId} refreshKey={playerAdmin_summaryRefreshKey} onRepairFactionReputation={playerAdmin_repairFactionReputation} factionRepairDisabled={!dbPlayerId || playerAdmin_isOnline} factionRepairResult={playerAdmin_actionResult?.key === "repairFactionReputation" ? playerAdmin_actionResult : null} actions={playerAdmin_summaryActions} />
       <div className="playerAdmin_tabs" role="group" aria-label="Player admin sections">{playerAdmin_tabs.map((playerAdmin_tab) => {
         const TabIcon = playerAdmin_tab.icon;
         return <button key={playerAdmin_tab.label} aria-pressed={playerAdmin_activeTab === playerAdmin_tab.label} className={playerAdmin_activeTab === playerAdmin_tab.label ? "active" : ""} onClick={() => playerAdmin_setActiveTab(playerAdmin_tab.label)}><TabIcon size={17} aria-hidden="true" /><span>{playerAdmin_tab.label}</span></button>;
@@ -1364,10 +1409,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
           ]
         }))) return;
         void playerAdmin_runAction("repairLoginQueue", `Repairing ${playerName}'s login queue`, () => playerAdmin_runTask(() => playersApi.repairLoginQueue(actionPlayerId, "REPAIR LOGIN QUEUE")), `${playerName}'s login queue was repaired. Ask the player to connect again.`, { actionType: "Repair Login Queue", target: playerName, amount: "1" });
-      }}>Repair Login Queue</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
-        if (!(await confirmAction(`Kick ${playerName} from the server?`))) return;
-        void playerAdmin_runAction("adminKick", `Kicking ${playerName}`, () => playerAdmin_runTask(() => playersApi.kick(actionPlayerId)), `${playerName} was kicked from the server.`, { actionType: "Kick Player", target: playerName, amount: "1" }, "danger");
-      }}>Kick Player</button><button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
+      }}>Repair Login Queue</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_kickPlayer()}>Kick Player</button><button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
         if (playerAdmin_isBanned) {
           if (!(await confirmAction(`Unban ${playerName}? This account will be allowed to connect again.`, {
             title: "Unban Player",
@@ -1394,7 +1436,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       }}>Wipe Inventory</button><button className="danger" disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
         if (!(await confirmAction(`Reset ${playerName}'s progression?`))) return;
         void playerAdmin_runAction("adminReset", `Resetting ${playerName}'s progression`, () => playerAdmin_runTask(() => playersApi.resetProgression(actionPlayerId, "RESET PROGRESSION")), `${playerName}'s progression was reset.`, { actionType: "Reset Progression", target: playerName, amount: "1" }, "danger");
-      }}>Reset Progression</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairLoginQueue" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminBan" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminUnban" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminWipe" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminReset" /></div></div></section><section className="playerAdmin_box"><h4>Movement / Vehicles</h4><PlayerTeleportControls playerId={dbPlayerId} playerName={playerName} isOnline={playerAdmin_isOnline} confirmAction={confirmAction} onRefresh={onRefresh} onActionLog={playerAdmin_addLog} /><div className="playerAdmin_actionRow playerAdmin_spawnVehicleRow"><span>Spawn Vehicle</span><select value={playerAdmin_vehicleId} onChange={(event) => { const nextVehicle = event.target.value; playerAdmin_setVehicleId(nextVehicle); playerAdmin_setVehicleTemplate([...(playerAdmin_vehicleCatalog[nextVehicle] || [])].sort((a, b) => friendlyVehicleTemplateName(a).localeCompare(friendlyVehicleTemplateName(b)))[0] || ""); }}>{playerAdmin_vehicleIds.length === 0 && <option value="">Manual Vehicle ID</option>}{playerAdmin_vehicleIds.map((id) => <option key={id} value={id}>{friendlyVehicleName(id)}</option>)}</select><select value={playerAdmin_vehicleTemplate} onChange={(event) => playerAdmin_setVehicleTemplate(event.target.value)}>{playerAdmin_selectedTemplates.length === 0 && <option value="">Manual Template</option>}{playerAdmin_selectedTemplates.map((template) => <option key={template} value={template}>{friendlyVehicleTemplateName(template)}</option>)}</select><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
+      }}>Reset Progression</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairLoginQueue" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminKick" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminBan" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminUnban" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminWipe" /><InlineActionResult result={playerAdmin_actionResult} resultKey="adminReset" /></div></div></section><section className="playerAdmin_box"><h4>Movement / Vehicles</h4><div ref={playerAdmin_teleportRef} className="playerAdmin_teleportAnchor"><PlayerTeleportControls playerId={dbPlayerId} playerName={playerName} isOnline={playerAdmin_isOnline} confirmAction={confirmAction} onRefresh={onRefresh} onActionLog={playerAdmin_addLog} /></div><div className="playerAdmin_actionRow playerAdmin_spawnVehicleRow"><span>Spawn Vehicle</span><select value={playerAdmin_vehicleId} onChange={(event) => { const nextVehicle = event.target.value; playerAdmin_setVehicleId(nextVehicle); playerAdmin_setVehicleTemplate([...(playerAdmin_vehicleCatalog[nextVehicle] || [])].sort((a, b) => friendlyVehicleTemplateName(a).localeCompare(friendlyVehicleTemplateName(b)))[0] || ""); }}>{playerAdmin_vehicleIds.length === 0 && <option value="">Manual Vehicle ID</option>}{playerAdmin_vehicleIds.map((id) => <option key={id} value={id}>{friendlyVehicleName(id)}</option>)}</select><select value={playerAdmin_vehicleTemplate} onChange={(event) => playerAdmin_setVehicleTemplate(event.target.value)}>{playerAdmin_selectedTemplates.length === 0 && <option value="">Manual Template</option>}{playerAdmin_selectedTemplates.map((template) => <option key={template} value={template}>{friendlyVehicleTemplateName(template)}</option>)}</select><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={async () => {
         const knownTemplates = Object.values(playerAdmin_vehicleCatalog).flat();
         if (knownTemplates.includes(playerAdmin_vehicleId) && !playerAdmin_vehicleCatalog[playerAdmin_vehicleId]) {
           playerAdmin_showResult("adminVehicle", `${playerAdmin_vehicleId} is a vehicle template, not a vehicle ID.`, "danger");

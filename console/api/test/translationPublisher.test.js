@@ -24,7 +24,10 @@ test('approved batch writes only reviewed locale files, creates one PR and dispa
   assert.equal((await prepareTranslationPRs({token:'synthetic-workflow-token',fetchImpl}))[0].existing,false);
   assert.deepEqual(tree.tree.map(item=>item.path),['console/api/data/i18n-reviewed/DE.json','console/api/data/i18n-reviewed/credits.json']);
   assert.equal(JSON.parse(tree.tree[0].content).Home,'Reviewed Startseite');assert.ok(tree.tree[1].content.includes('Desert Helper'));assert.equal(dispatches,1);
-  assert.ok(requests.some(([url,options])=>url.endsWith('/pulls')&&JSON.parse(options.body).body.includes('[TR-000123](https://dunedocker.app/translations.html#TR-000123)')));
+  const [,pullRequest] = requests.find(([url]) => url.endsWith('/pulls'));
+  const description = JSON.parse(pullRequest.body).body;
+  assert.match(description, /Desert Helper/);
+  assert.doesNotMatch(description, /TR-000123|translations\.html|Batch:/);
   assert.equal((await prepareTranslationPRs({token:'synthetic-workflow-token',fetchImpl}))[0].existing,true);assert.equal(commits,1);assert.equal(dispatches,1);
   assert.ok(requests.every(([url])=>url.startsWith('https://api.github.com/repos/Red-Blink/dune-awakening-selfhost-docker/')||url==='https://dunedocker.app/api/v1/translations/releases/pending'));
 });

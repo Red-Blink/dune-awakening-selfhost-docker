@@ -3817,6 +3817,105 @@
     ],
     "DA_CT_Trainer_Trooper2_06": [
       "Contract.Tracking.Completed.KaraValk.Contract6"
+    ],
+    "DA_CT_Chapter3_DeliverSpiceToElara": [
+      "Contract.Tracking.Completed.Elara.DeliveredSpiceBribe"
+    ],
+    "DA_CT_Fac_Atre_Rep01_01_Arms": [],
+    "DA_CT_Fac_Atre_Rep01_02_Armor": [],
+    "DA_CT_Fac_Hark_Rep01_01_Deserters": [],
+    "DA_CT_Fac_Hark_Rep01_02_RifleDelivery": [],
+    "DA_CT_Halloween_Day01": [
+      "Contract.Tracking.Completed.Halloween_Day01"
+    ],
+    "DA_CT_Halloween_Day02": [
+      "Contract.Tracking.Completed.Halloween_Day02"
+    ],
+    "DA_CT_Halloween_Day03": [
+      "Contract.Tracking.Completed.Halloween_Day03"
+    ],
+    "DA_CT_Halloween_Day04": [
+      "Contract.Tracking.Completed.Halloween_Day04"
+    ],
+    "DA_CT_Halloween_Day05": [
+      "Contract.Tracking.Completed.Halloween_Day05"
+    ],
+    "DA_CT_Halloween_Day06": [
+      "Contract.Tracking.Completed.Halloween_Day06"
+    ],
+    "DA_CT_Halloween_Day07": [
+      "Contract.Tracking.Completed.Halloween_Day07"
+    ],
+    "DA_CT_Halloween_Day08": [
+      "Contract.Tracking.Completed.Halloween_Day08",
+      "Contract.Tracking.Halloween.DailiesCompleted"
+    ],
+    "DA_CT_Halloween_Day09": [
+      "Contract.Tracking.Completed.Halloween_Day09"
+    ],
+    "DA_CT_Halloween_Day10": [
+      "Contract.Tracking.Completed.Halloween_Day10"
+    ],
+    "DA_CT_Halloween_Week1_01": [
+      "Contract.Tracking.Completed.Halloween_Week1_01"
+    ],
+    "DA_CT_Halloween_Week1_02": [
+      "Contract.Tracking.Completed.Halloween_week1_02"
+    ],
+    "DA_CT_Halloween_Week1_03": [
+      "Contract.Tracking.Completed.Halloween_Week1_03"
+    ],
+    "DA_CT_Halloween_Week2_01": [
+      "Contract.Tracking.Completed.Halloween_Week2_01"
+    ],
+    "DA_CT_Halloween_Week2_01_Funnel": [
+      "Contract.Tracking.Completed.Halloween_Week2_01_Funnel"
+    ],
+    "DA_CT_Halloween_Week2_02": [
+      "Contract.Tracking.Completed.Halloween_Week2_02"
+    ],
+    "DA_CT_Halloween_Week3_01": [
+      "Contract.Tracking.Completed.Halloween_Week3_01"
+    ],
+    "DA_CT_Halloween_Week3_01_Funnel": [
+      "Contract.Tracking.Completed.Halloween_Week3_01_Funnel"
+    ],
+    "DA_CT_Halloween_Week3_02": [
+      "Contract.Tracking.Completed.Halloween_Week3_02"
+    ],
+    "DA_CT_Halloween_Week3_03": [],
+    "DA_CT_Survival1_Kirab1_05": [
+      "Contract.Tracking.Completed.Kirab1_Contract5"
+    ],
+    "DA_CT_Trainer_BeneGesserit1_Funnel_01": [
+      "Contract.Tracking.Completed.BeneGesseritFunnel1"
+    ],
+    "DA_CT_Trainer_Mentat1_Funnel_01": [
+      "Contract.Tracking.Completed.MentatFunnel1"
+    ],
+    "DA_CT_Trainer_Planetologist1_Funnel_01": [
+      "Contract.Tracking.Completed.PlanetologistFunnel1"
+    ],
+    "DA_CT_Trainer_Planetologist2_Funnel_01": [
+      "Contract.Tracking.Completed.PlanetologistFunnel2_01"
+    ],
+    "DA_CT_Trainer_Planetologist2_Funnel_02": [
+      "Contract.Tracking.Completed.PlanetologistFunnel2_02"
+    ],
+    "DA_CT_Trainer_Planetologist2_Funnel_03": [
+      "Contract.Tracking.Completed.PlanetologistFunnel2_03"
+    ],
+    "DA_CT_Trainer_Planetologist2_Funnel_04": [
+      "Contract.Tracking.Completed.PlanetologistFunnel2_04"
+    ],
+    "DA_CT_Trainer_Planetologist2_Funnel_05": [
+      "Contract.Tracking.Completed.PlanetologistFunnel2_05"
+    ],
+    "DA_CT_Trainer_Swordmaster1_Funnel_01": [
+      "Contract.Tracking.Completed.SwordmasterFunnel1"
+    ],
+    "DA_CT_Trainer_Trooper1_Funnel_01": [
+      "Contract.Tracking.Completed.TrooperFunnel1"
     ]
   },
   "contract_aliases": {
@@ -4074,7 +4173,43 @@
     "Trainer_Trooper2_03": "DA_CT_Trainer_Trooper2_03",
     "Trainer_Trooper2_04": "DA_CT_Trainer_Trooper2_04",
     "Trainer_Trooper2_05": "DA_CT_Trainer_Trooper2_05",
-    "Trainer_Trooper2_06": "DA_CT_Trainer_Trooper2_06"
+    "Trainer_Trooper2_06": "DA_CT_Trainer_Trooper2_06",
+    "Chapter3_DeliverSpiceToElara": "DA_CT_Chapter3_DeliverSpiceToElara",
+    "Fac_Atre_Rep01_01_Arms": "DA_CT_Fac_Atre_Rep01_01_Arms",
+    "Fac_Atre_Rep01_02_Armor": "DA_CT_Fac_Atre_Rep01_02_Armor",
+    "Fac_Hark_Rep01_01_Deserters": "DA_CT_Fac_Hark_Rep01_01_Deserters",
+    "Fac_Hark_Rep01_02_RifleDelivery": "DA_CT_Fac_Hark_Rep01_02_RifleDelivery",
+    "Halloween_Day01": "DA_CT_Halloween_Day01",
+    "Halloween_Day02": "DA_CT_Halloween_Day02",
+    "Halloween_Day03": "DA_CT_Halloween_Day03",
+    "Halloween_Day04": "DA_CT_Halloween_Day04",
+    "Halloween_Day05": "DA_CT_Halloween_Day05",
+    "Halloween_Day06": "DA_CT_Halloween_Day06",
+    "Halloween_Day07": "DA_CT_Halloween_Day07",
+    "Halloween_Day08": "DA_CT_Halloween_Day08",
+    "Halloween_Day09": "DA_CT_Halloween_Day09",
+    "Halloween_Day10": "DA_CT_Halloween_Day10",
+    "Halloween_Week1_01": "DA_CT_Halloween_Week1_01",
+    "Halloween_Week1_02": "DA_CT_Halloween_Week1_02",
+    "Halloween_Week1_03": "DA_CT_Halloween_Week1_03",
+    "Halloween_Week2_01": "DA_CT_Halloween_Week2_01",
+    "Halloween_Week2_01_Funnel": "DA_CT_Halloween_Week2_01_Funnel",
+    "Halloween_Week2_02": "DA_CT_Halloween_Week2_02",
+    "Halloween_Week3_01": "DA_CT_Halloween_Week3_01",
+    "Halloween_Week3_01_Funnel": "DA_CT_Halloween_Week3_01_Funnel",
+    "Halloween_Week3_02": "DA_CT_Halloween_Week3_02",
+    "Halloween_Week3_03": "DA_CT_Halloween_Week3_03",
+    "Survival1_Kirab1_05": "DA_CT_Survival1_Kirab1_05",
+    "Trainer_BeneGesserit1_Funnel_01": "DA_CT_Trainer_BeneGesserit1_Funnel_01",
+    "Trainer_Mentat1_Funnel_01": "DA_CT_Trainer_Mentat1_Funnel_01",
+    "Trainer_Planetologist1_Funnel_01": "DA_CT_Trainer_Planetologist1_Funnel_01",
+    "Trainer_Planetologist2_Funnel_01": "DA_CT_Trainer_Planetologist2_Funnel_01",
+    "Trainer_Planetologist2_Funnel_02": "DA_CT_Trainer_Planetologist2_Funnel_02",
+    "Trainer_Planetologist2_Funnel_03": "DA_CT_Trainer_Planetologist2_Funnel_03",
+    "Trainer_Planetologist2_Funnel_04": "DA_CT_Trainer_Planetologist2_Funnel_04",
+    "Trainer_Planetologist2_Funnel_05": "DA_CT_Trainer_Planetologist2_Funnel_05",
+    "Trainer_Swordmaster1_Funnel_01": "DA_CT_Trainer_Swordmaster1_Funnel_01",
+    "Trainer_Trooper1_Funnel_01": "DA_CT_Trainer_Trooper1_Funnel_01"
   },
   "contract_remove_tags": {
     "DA_CT_Fac_Atre_Rank04_05_Skorda": [
@@ -4082,6 +4217,48 @@
     ],
     "DA_CT_Fac_Hark_Rank04_05_Skorda": [
       "Contract.Tracking.FactionStory.ShowSkorda"
+    ],
+    "DA_CT_Halloween_Day01": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Day02": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Day03": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Day06": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Day07": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Day08": [
+      "Contract.Tracking.Halloween.DailiesActive"
+    ],
+    "DA_CT_Halloween_Week2_01_Funnel": [
+      "Contract.Target.Dialogue.Halloween.Phase2FunnelCompleted"
+    ],
+    "DA_CT_Halloween_Week3_01_Funnel": [
+      "Contract.Target.Dialogue.Halloween.Phase3FunnelCompleted"
+    ],
+    "DA_CT_Halloween_Week3_03": [
+      "Contract.Target.Dialogue.Halloween.Complete303"
+    ],
+    "DA_CT_Trainer_BeneGesserit1_Funnel_01": [
+      "Contract.Tracking.MetSisterMesa"
+    ],
+    "DA_CT_Trainer_Mentat1_Funnel_01": [
+      "Contract.Tracking.MetSaminMoro"
+    ],
+    "DA_CT_Trainer_Planetologist1_Funnel_01": [
+      "Contract.Tracking.MetDerek"
+    ],
+    "DA_CT_Trainer_Swordmaster1_Funnel_01": [
+      "Contract.Tracking.MetArno"
+    ],
+    "DA_CT_Trainer_Trooper1_Funnel_01": [
+      "Contract.Tracking.MetGhavouri"
     ]
   },
   "contract_skill_grants": {

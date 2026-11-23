@@ -128,6 +128,43 @@ test("real catalog exposes only verified Filmic Archive grant tokens through the
   }
 });
 
+test("mission placeables are searchable and resolve to their native building patent for grants", () => {
+  const rewards = [
+    ["Suspensor Light of the Tyrant Worm", "MTX_MaasKharet_Glowglobe_Patent"],
+    ["Ruddy Glowglobe of Slaughter", "MTX_TheGluttonRedLight_Glowglobe_Patent"],
+    ["Poisoned Citadel Solido", "MTX_WaterFatManorProjection_Patent"],
+    ["Rug of the Desert Flyers", "MTX_ArakeenAlleyway_Carpet_Patent"],
+    ["Ascendant Throne of the Reverend Mother", "MTX_RevMotherFloatingChair_Patent"],
+    ["Mounted Minotaur Mask", "MTX_MinotaurMaskWall_Patent"],
+    ["Twin Blades of the Arena", "MTX_DualBladesDeco_Patent"],
+    ["Zanovar Arboretum Tree Solido", "MTX_DestroyedZanovar_Hologram_Patent"],
+    ["Glossu Rabban Solido", "MTX_BeastRabbanProjection_Patent"],
+    ["Duke Leto Atreides Solido", "MTX_DukeLetoProjection_Patent"],
+    ["Recovered Portrait from Old Carthag", "MTX_PhaedraPortrait_Patent"],
+    ["Maw of the Worm Wall Relief", "MTX_WormMouthWall_Patent"],
+  ];
+  const unlocks = listBuildingUnlockItems(REAL_REPO_ROOT);
+  const inventoryIds = new Set(listCatalogItems(REAL_REPO_ROOT, { limit: 10000 }).map((row) => row.itemId));
+  for (const [name, itemId] of rewards) {
+    const matches = unlocks.filter((row) => row.name === name);
+    assert.deepEqual(matches.map((row) => row.itemId), [itemId]);
+    assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemId }).source, "BuildingSets");
+    assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemName: name }).itemId, itemId);
+    assert.equal(matches[0].experimental, false);
+    assert.equal(inventoryIds.has(itemId), false);
+  }
+});
+
+test("Call to Adventure appears once in Building Sets and resolves by name and patent ID", () => {
+  const name = "Mural: Call to Adventure";
+  const itemId = "MTX_Neut_MuralPainting_03_Patent";
+  const matches = listBuildingUnlockItems(REAL_REPO_ROOT).filter((row) => row.name === name);
+  assert.deepEqual(matches.map((row) => row.itemId), [itemId]);
+  assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemName: name }).itemId, itemId);
+  assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemId }).name, name);
+  assert.equal(matches[0].entitlementControlled, true);
+});
+
 test("real catalog exposes the verified Ixian Icon patent through building unlocks", () => {
   // The exact token is present in build 2160922's CDT_BaseItems. The item
   // listing names it Ixian Icon and links it to A Sign from Above:

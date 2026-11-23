@@ -224,6 +224,8 @@ export const ROUTE_ACTIONS = {
   "GET /api/players/online":                   "players:read",
   "GET /api/players/search":                   "players:read",
   "GET /api/players/deleted-characters":       "players:read",
+  "GET /api/dungeons/runs":                    "players:read",
+  "GET /api/dungeons/leaderboard":             "players:read",
   "POST /api/players/list-settings":           "players:configure-list",
 
   // --- Vehicles ---

@@ -19,6 +19,15 @@ vi.mock("../../api/players", () => ({
   }
 }));
 vi.mock("../../api/vehicles", () => ({ vehiclesApi: { deleteVehicle: vi.fn(), pendingDeletes: vi.fn().mockResolvedValue({ supported: true, total: 0, pending: [], byTarget: [] }) } }));
+vi.mock("../../api/dungeons", () => ({
+  dungeonsApi: {
+    runs: vi.fn().mockResolvedValue({ capabilities: { dungeons: true }, totalCount: 0, totalRuns: 0, runs: [] }),
+    leaderboard: vi.fn().mockResolvedValue({
+      capabilities: { dungeons: true },
+      entries: [{ runCount: 1, best: { completionId: 1, dungeonId: "DA_Dgn_136_Fire", difficulty: 2, durationMs: 872671, playerCount: 1, party: [{ controllerId: 84, actorId: 82, characterName: "Vixen" }] } }]
+    })
+  }
+}));
 
 const bannedPlayer = {
   actor_id: "82",
@@ -307,5 +316,29 @@ describe("PlayersPanel view mode", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Active Players" }));
     expect(await screen.findByText("Vixen")).toBeInTheDocument();
     expect(screen.queryByTestId("player-detail")).not.toBeInTheDocument();
+  });
+});
+
+describe("PlayersPanel Dungeon Runs view", () => {
+  it("opens a party member in Active Players and scrolls to them once their profile has loaded", async () => {
+    const scrolled: string[] = [];
+    // jsdom has no scrollIntoView; define one that records its target.
+    const originalScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.className); };
+    const frameSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => { callback(0); return 1; });
+    let resolveProfile: (value: unknown) => void = () => {};
+    vi.mocked(playersApi.profile).mockImplementation(() => new Promise((resolve) => { resolveProfile = resolve; }) as never);
+    render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+    await screen.findByText("Vixen");
+    fireEvent.click(screen.getByRole("radio", { name: "Dungeon Runs" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Vixen" }));
+    expect(screen.getByRole("radio", { name: "Active Players" })).toBeChecked();
+    expect(playersApi.profile).toHaveBeenCalledWith("82");
+    const beforeProfile = scrolled.length;
+    await act(async () => { resolveProfile({ player: bannedPlayer }); });
+    await waitFor(() => expect(scrolled.length).toBeGreaterThan(beforeProfile));
+    expect(scrolled.slice(beforeProfile)).toContain("players-detail-anchor");
+    Element.prototype.scrollIntoView = originalScroll;
+    frameSpy.mockRestore();
   });
 });
