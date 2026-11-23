@@ -100,9 +100,9 @@ function resolveImportInstance(inst) {
 }
 
 function resolveImportPlaceable(pl) {
-  // Solido JSON uses ordinary 3D axes (rx=pitch, ry=yaw, rz=roll), while
-  // Patch 1.5 persists placeables as X, Y, Z, Yaw, Pitch, Roll.
-  const transform = `{${pl.x},${pl.y},${pl.z},${pl.ry ?? 0},${pl.rx ?? 0},${pl.rz ?? 0}}`;
+  // The game applies the three rotation slots as Pitch, Yaw, Roll when it
+  // projects the Solido. A heading in the first slot tilts the equipment.
+  const transform = `{${pl.x},${pl.y},${pl.z},${pl.rx ?? 0},${pl.ry ?? 0},${pl.rz ?? 0}}`;
   return { transform };
 }
 
@@ -190,6 +190,19 @@ async function insertBuildingPlaceables(tx, blueprintId, placeables) {
   return sourceToId;
 }
 
+async function ensurePlaceableRotationTable(tx) {
+  // Keep provenance separate from Funcom's Solido item and geometry records.
+  // The lock serializes creation if the first imports run concurrently.
+  if (!(await tableExistsGeneric(tx, "console_blueprint_pitch_first"))) {
+    await tx.query("select pg_advisory_xact_lock(hashtext('dune.console_blueprint_pitch_first'))");
+    await tx.query(`
+      create table if not exists dune.console_blueprint_pitch_first (
+        blueprint_id bigint primary key,
+        item_id bigint not null
+      )`);
+  }
+}
+
 async function insertBuildingPentashields(tx, blueprintId, pentashields, placeableIdMap = new Map()) {
   for (const ps of pentashields) {
     const s = ps.scale;
@@ -251,6 +264,7 @@ export async function importBlueprint(db, playerPawnId, blueprintFile, fallbackN
   const combinedWarning = warnings.join(" ");
 
   return db.transaction(async (tx) => {
+    if (hasPlaceables) await ensurePlaceableRotationTable(tx);
     const baseName = blueprintName.replace(/\s*\(\d+\)\s*$/, " ").trim();
     let candidate = baseName;
     let dedupeIdx = 1;
@@ -315,8 +329,13 @@ export async function importBlueprint(db, playerPawnId, blueprintFile, fallbackN
     }
     let placeableIdMap = new Map();
     if (placeables.length > 0) {
-      const normalizedPlaceables = normalizeLegacyPlaceableRotations(placeables);
+      const normalizedPlaceables = bf.designer?.placeableRotationConvention === "native-yaw-y"
+        ? placeables
+        : normalizeLegacyPlaceableRotations(placeables);
       placeableIdMap = await insertBuildingPlaceables(tx, blueprintId, normalizedPlaceables);
+      await tx.query(`
+        insert into dune.console_blueprint_pitch_first (blueprint_id, item_id) values ($1, $2)
+        on conflict (blueprint_id) do update set item_id = excluded.item_id`, [blueprintId, itemId]);
     }
     if (pentashields.length > 0) {
       await insertBuildingPentashields(tx, blueprintId, pentashields, placeableIdMap);
@@ -344,11 +363,17 @@ export async function exportBlueprint(db, blueprintId) {
   requireBlueprintCapability(capable);
 
   const nameRow = await db.query(`
-    select coalesce(i.stats->'FBuildingBlueprintItemStats'->1->>'BuildingBlueprintName', '') as name
+    select bb.item_id, coalesce(i.stats->'FBuildingBlueprintItemStats'->1->>'BuildingBlueprintName', '') as name
     from dune.building_blueprints bb
     join dune.items i on i.id = bb.item_id
     where bb.id = $1`, [blueprintId]);
   const name = nameRow.rows[0]?.name || "";
+  const itemId = nameRow.rows[0]?.item_id;
+  const pitchFirst = itemId != null
+    && await tableExistsGeneric(db, "console_blueprint_pitch_first")
+    && Boolean((await db.query(
+      "select 1 from dune.console_blueprint_pitch_first where blueprint_id = $1 and item_id = $2", [blueprintId, itemId]
+    )).rows[0]);
 
   const instRows = await db.query(`
     select instance_id, building_type, transform, provides_stability
@@ -387,8 +412,8 @@ export async function exportBlueprint(db, blueprintId) {
       x: t[0] || 0,
       y: t[1] || 0,
       z: t[2] || 0,
-      rx: t[4] || 0,
-      ry: t[3] || 0,
+      rx: t[pitchFirst ? 3 : 4] || 0,
+      ry: t[pitchFirst ? 4 : 3] || 0,
       rz: t[5] || 0
     };
   });
@@ -412,6 +437,7 @@ export async function exportBlueprint(db, blueprintId) {
 
   return {
     name,
+    designer: { coordinateConvention: "game-v1", placeableRotationConvention: "native-yaw-y" },
     instances,
     placeables,
     pentashields: pentashields.length > 0 ? pentashields : undefined
@@ -455,6 +481,9 @@ export async function deleteBlueprint(db, blueprintId) {
 
     const itemId = bpRow.rows[0].item_id;
 
+    if (await tableExistsGeneric(tx, "console_blueprint_pitch_first")) {
+      await tx.query("delete from dune.console_blueprint_pitch_first where blueprint_id = $1 and item_id = $2", [blueprintId, itemId]);
+    }
     await tx.query("delete from dune.building_blueprint_pentashields where building_blueprint_id = $1", [blueprintId]);
     await tx.query("delete from dune.building_blueprint_placeables where building_blueprint_id = $1", [blueprintId]);
     await tx.query("delete from dune.building_blueprint_instances where building_blueprint_id = $1", [blueprintId]);

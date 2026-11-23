@@ -15,8 +15,6 @@ test("blueprint array-bound repair is wired after successful database migration"
   assert.match(patchSql, /blueprint[.]player_id IS NOT NULL/);
   assert.match(patchSql, /array_lower\(child[.]transform, 1\) = 0/);
   assert.match(patchSql, /array_lower\(child[.]scale, 1\) = 0/);
-  assert.match(patchSql, /blueprint-placeable-yaw-first-v1/);
-  assert.match(patchSql, /dune_runtime[.]compatibility_migrations/);
 });
 
 test("real PostgreSQL: blueprint repair restores only Console imports and preserves values", async (t) => {
@@ -48,7 +46,8 @@ test("real PostgreSQL: blueprint repair restores only Console imports and preser
         (1, 10, '[0:5]={10,20,30,40,50,60}'),
         (2, 10, '{70,80,90,100,110,120}'),
         (3, 20, '[0:5]={130,140,150,160,170,180}'),
-        (4, 20, '{190,200,210,220,230,240}');
+        (4, 20, '{190,200,210,220,230,240}'),
+        (5, 10, '{26,60,70,250,0,0}');
       insert into dune.building_blueprint_pentashields values
         (1, 10, '[0:2]={2,4,6}'),
         (2, 10, '{8,10,12}'),
@@ -82,7 +81,8 @@ test("real PostgreSQL: blueprint repair restores only Console imports and preser
       { id: 1, lower_bound: 1, first: 10, last: 60 },
       { id: 2, lower_bound: 1, first: 70, last: 120 },
       { id: 3, lower_bound: 0, first: 130, last: 180 },
-      { id: 4, lower_bound: 1, first: 190, last: 240 }
+      { id: 4, lower_bound: 1, first: 190, last: 240 },
+      { id: 5, lower_bound: 1, first: 26, last: 0 }
     ]);
 
     const placeableAxes = await pool.query(`
@@ -90,10 +90,11 @@ test("real PostgreSQL: blueprint repair restores only Console imports and preser
       from dune.building_blueprint_placeables order by id
     `);
     assert.deepEqual(placeableAxes.rows, [
-      { id: 1, transform: "{10,20,30,50,40,60}" },
-      { id: 2, transform: "{70,80,90,110,100,120}" },
+      { id: 1, transform: "{10,20,30,40,50,60}" },
+      { id: 2, transform: "{70,80,90,100,110,120}" },
       { id: 3, transform: "[0:5]={130,140,150,160,170,180}" },
-      { id: 4, transform: "{190,200,210,220,230,240}" }
+      { id: 4, transform: "{190,200,210,220,230,240}" },
+      { id: 5, transform: "{26,60,70,250,0,0}" }
     ]);
 
     const shields = await pool.query(`

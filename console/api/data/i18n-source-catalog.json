@@ -193,6 +193,8 @@
     "All Categories",
     "All Categories ({count0})",
     "All Channels",
+    "All Difficulties",
+    "All Dungeons",
     "All Groups",
     "All Languages",
     "All Listings",
@@ -203,6 +205,7 @@
     "All Qualities",
     "All Recorded Time",
     "All Restarts",
+    "All Runs",
     "All Sets",
     "All Types",
     "All levels",
@@ -395,6 +398,9 @@
     "Bene Gesserit",
     "Bene Gesserit starter skills",
     "Bengali",
+    "Best Time",
+    "Best Time by Difficulty",
+    "Best Times",
     "Best experience: run it directly on a Linux server.",
     "Beyond the Dunes, Every Choice Shapes the Future",
     "Binding Fixed",
@@ -748,6 +754,7 @@
     "Contents view",
     "Continue With Discord",
     "Continue With Tailscale",
+    "Continue",
     "Continue?",
     "Contract Abandon Cooldown",
     "Contract Repeat Cooldown",
@@ -979,6 +986,7 @@
     "Developer raw package item textarea",
     "Diagnostic Note",
     "Diagnostic Warning",
+    "Difficulty",
     "Dimension",
     "Direct Unlocks",
     "Direct edits to database tables.",
@@ -1098,6 +1106,12 @@
     "Dune.GiveDoubleDifficultyLoot",
     "Dune.GlobalMiningOutputMultiplier",
     "Dune.GlobalVehicleMiningOutputMultiplier",
+    "Dungeon",
+    "Dungeon Runs",
+    "Dungeon Runs View",
+    "Dungeon runs aren't available on this database version.",
+    "Dungeon runs couldn't be loaded.",
+    "Dungeons",
     "Durability",
     "Durability not reported",
     "Duration",
@@ -1266,6 +1280,7 @@
     "Failed",
     "Failed to load language dictionary.",
     "False",
+    "Fastest Clear",
     "Field ID",
     "File database patches",
     "File game build",
@@ -1290,6 +1305,7 @@
     "Filter Research Schematics",
     "Filter Spice Field Settings",
     "Filter base inventory",
+    "Filter by Character Name or Actor ID",
     "Filter by container group",
     "Filter by map, size, or dimension",
     "Filter by name, ID, status, or dependency",
@@ -1475,6 +1491,7 @@
     "Hide Disable Options",
     "Hide Inactive Players After",
     "Hide Password Form",
+    "Highest Difficulty",
     "Highlights",
     "Hindi",
     "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.",
@@ -1507,6 +1524,7 @@
     "IP Monitor Saved Successfully",
     "IP Monitor Timer Failed",
     "Icelandic",
+    "Identity",
     "Idle · Monitoring",
     "If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.",
     "If automatic install is not available in this environment, run this on the Linux host:",
@@ -1746,6 +1764,7 @@
     "Loading community addons...",
     "Loading customizations...",
     "Loading definition...",
+    "Loading dungeon runs…",
     "Loading functions and procedures...",
     "Loading journey data...",
     "Loading land claim",
@@ -1894,6 +1913,7 @@
     "Modifier view",
     "Modules",
     "More",
+    "More than one player matches. Enter the full character name or actor ID.",
     "Most Downloaded",
     "Most Liked",
     "Movement / Vehicles",
@@ -2006,6 +2026,7 @@
     "No database backups have been created yet.",
     "No deleted characters are holding bases or vehicles.",
     "No description was provided.",
+    "No dungeon runs recorded.",
     "No eligible players were found for this rule.",
     "No existing installation was found in the standard host locations or Docker containers.",
     "No generators have queued fuel",
@@ -2034,6 +2055,7 @@
     "No output.",
     "No partitions available",
     "No permissions match your search.",
+    "No player matches that name.",
     "No player sell listings on this exchange.",
     "No players are currently online.",
     "No players are online",
@@ -2046,6 +2068,7 @@
     "No research entries found for this filter.",
     "No results found.",
     "No results yet. Enter a name and press Search.",
+    "No runs match these filters.",
     "No runs yet.",
     "No scheduled messages yet",
     "No seed plan selected.",
@@ -2418,6 +2441,7 @@
     "Rebuilding and restarting the web console container.",
     "Recent Kills",
     "Recent Kills Rows",
+    "Recent Runs",
     "Recipe",
     "Recipe ID",
     "Recipe Repaired",
@@ -2714,6 +2738,7 @@
     "Running database migrations for the updated build.",
     "Running, newly started, and rebalanced game servers now preserve the configured emergency swap allowance.",
     "Running…",
+    "Runs",
     "Runtime Configuration",
     "Runtime Location",
     "Runtime file checks have not loaded yet.",
@@ -2989,6 +3014,8 @@
     "Show all {count0} items",
     "Show fewer items",
     "Showing",
+    "Showing runs for",
+    "Showing the latest {count0} runs.",
     "Showing up to 100 players and 50 recent kills.",
     "Showing {count0}-{count1} of {count2} item ({count3} total).",
     "Showing {count0}-{count1} of {count2} item.",
@@ -3471,6 +3498,7 @@
     "Unused Docker build cache can be cleaned",
     "Unused Docker build cache was cleaned.",
     "Unused Docker images can be cleaned",
+    "Unverified Game Build",
     "Up 1d ago",
     "Up 1h ago",
     "Up 1m ago",
@@ -3808,10 +3836,13 @@
     "with the server’s SSH username and",
     "{count0}",
     "{count0} distinct",
+    "{count0} dungeon and difficulty pairs · {count1} runs",
     "{count0} fields",
     "{count0} of {count1}",
+    "{count0} of {count1} runs · Newest First",
     "{count0} palettes",
     "{count0} rows",
+    "{count0} runs · Newest First",
     "{count0} warnings",
     "{count0}d {count1}h",
     "{count0}h ago",
@@ -4748,6 +4779,17 @@
         ]
       }
     ],
+    "{count0} dungeon and difficulty pairs · {count1} runs": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 246,
+        "nearby": [
+          "Dungeon runs couldn't be loaded.",
+          "Loading dungeon runs…",
+          "No runs match these filters."
+        ]
+      }
+    ],
     "{count0} fields": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -4780,7 +4822,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1218,
+        "line": 1250,
         "nearby": [
           "Filter Crafting Schematics",
           "Clear",
@@ -4790,12 +4832,23 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1245,
+        "line": 1277,
         "nearby": [
           "Filter Research Schematics",
           "Clear",
           "Research Entr",
           "ies"
+        ]
+      }
+    ],
+    "{count0} of {count1} runs · Newest First": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 263,
+        "nearby": [
+          "No dungeon runs recorded.",
+          "Loading dungeon runs…",
+          "{count0} runs · Newest First"
         ]
       }
     ],
@@ -4819,6 +4872,17 @@
           "Unknown",
           "{count0} fields",
           "Map Change Failed"
+        ]
+      }
+    ],
+    "{count0} runs · Newest First": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 264,
+        "nearby": [
+          "Loading dungeon runs…",
+          "{count0} of {count1} runs · Newest First",
+          "No runs match these filters."
         ]
       }
     ],
@@ -4856,7 +4920,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 511,
+        "line": 534,
         "nearby": [
           "Currently Active",
           "Unavailable",
@@ -4900,7 +4964,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 512,
+        "line": 535,
         "nearby": [
           "Unavailable",
           "{count0}h {count1}m",
@@ -5046,7 +5110,7 @@
     "1 Month": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 396,
+        "line": 419,
         "nearby": [
           "2 Weeks",
           "3 Weeks",
@@ -5070,7 +5134,7 @@
     "1 Week": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 393,
+        "line": 416,
         "nearby": [
           "Never",
           "Weeks",
@@ -5093,7 +5157,7 @@
     "2 Months": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 397,
+        "line": 420,
         "nearby": [
           "3 Weeks",
           "1 Month",
@@ -5105,7 +5169,7 @@
     "2 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 394,
+        "line": 417,
         "nearby": [
           "Weeks",
           "1 Week",
@@ -5117,7 +5181,7 @@
     "3 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 395,
+        "line": 418,
         "nearby": [
           "1 Week",
           "2 Weeks",
@@ -5334,7 +5398,7 @@
     "A relog is required to see the change.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Loadout",
           "Unique schematics",
@@ -5487,7 +5551,7 @@
     "About Faction Reputation": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1196,
+        "line": 1228,
         "nearby": [
           "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.",
           "Give Faction Reputation",
@@ -5499,7 +5563,7 @@
     "About Give Intel": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1227,
         "nearby": [
           "Refill Container",
           "Give Intel",
@@ -5582,7 +5646,7 @@
     "About Repair Vehicle Durability": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Repair Gear",
           "Repair Vehicle Durability",
@@ -5719,7 +5783,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 140,
+        "line": 175,
         "nearby": [
           "FLS ID",
           "DB Player",
@@ -5777,7 +5841,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1122,
+        "line": 1135,
         "nearby": [
           "Tags",
           "Result",
@@ -5879,7 +5943,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Augments",
           "Aug. Grade",
@@ -6339,7 +6403,7 @@
     "Add Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Give Package",
           "Give Item",
@@ -6758,7 +6822,7 @@
     "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1227,
         "nearby": [
           "Give Intel",
           "About Give Intel",
@@ -6980,7 +7044,7 @@
     "Advanced manual override": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Manual Template",
           "Spawn",
@@ -7087,9 +7151,9 @@
     "Alignment": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 188,
+        "line": 289,
         "nearby": [
-          "Spice Addiction",
+          "Dungeon Runs",
           "Faction",
           "Faction Standings",
           "Rep"
@@ -7233,6 +7297,30 @@
         ]
       }
     ],
+    "All Difficulties": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 221,
+        "nearby": [
+          "All Dungeons",
+          "Difficulty",
+          "Refresh",
+          "Filter by Character Name or Actor ID"
+        ]
+      }
+    ],
+    "All Dungeons": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 217,
+        "nearby": [
+          "Dungeon Runs View",
+          "Dungeon",
+          "Difficulty",
+          "All Difficulties"
+        ]
+      }
+    ],
     "All Groups": [
       {
         "file": "console/web/src/features/players/BuildingUnlocksTab.tsx",
@@ -7291,7 +7379,7 @@
     "All Players": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 378,
+        "line": 401,
         "nearby": [
           "Filter",
           "Status filtering isn't available on this database version",
@@ -7303,7 +7391,7 @@
     "All Product Groups": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1248,
+        "line": 1280,
         "nearby": [
           "ies",
           "Detected",
@@ -7357,6 +7445,17 @@
           "Type",
           "Functions",
           "Procedures"
+        ]
+      }
+    ],
+    "All Runs": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 16,
+        "nearby": [
+          "Leaderboard",
+          "No player matches that name.",
+          "More than one player matches. Enter the full character name or actor ID."
         ]
       }
     ],
@@ -8445,7 +8544,7 @@
     "Aug. Grade": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Grade",
           "Augments",
@@ -8455,7 +8554,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Grade",
           "Augments",
@@ -8539,7 +8638,7 @@
     "Augments": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Quantity",
           "Grade",
@@ -8549,7 +8648,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Quantity",
           "Grade",
@@ -9223,12 +9322,12 @@
     "Available Intel": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 173,
+        "line": 279,
         "nearby": [
           "XP",
           "Skill Points",
-          "Vitals",
-          "Health"
+          "Dungeon Runs",
+          "Faction"
         ]
       }
     ],
@@ -9406,7 +9505,7 @@
     "Backpack": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Remove",
           "Inventory type",
@@ -9722,7 +9821,7 @@
     "Ban Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1395,
+        "line": 1424,
         "nearby": [
           "Unban Player",
           "Player"
@@ -9730,7 +9829,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1396,
+        "line": 1425,
         "nearby": [
           "Player",
           "Enforcement"
@@ -9738,7 +9837,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1404,
+        "line": 1433,
         "nearby": [
           "Enforcement",
           "Unban Player",
@@ -9750,7 +9849,7 @@
     "Banned": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 381,
+        "line": 404,
         "nearby": [
           "Online",
           "Offline",
@@ -10519,7 +10618,7 @@
     "Bene Gesserit starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 985,
+        "line": 998,
         "nearby": [
           "Mentat starter skills",
           "Planetologist starter skills",
@@ -10537,6 +10636,18 @@
           "Run and manage your Dune: Awakening self-hosted Docker server from a browser. The console guides the first setup, then gives you the tools to manage maps, players, updates, backups, and admin work in one place.",
           "Also possible: Docker Desktop on Windows/WSL2 or a virtual machine.",
           "You will need your"
+        ]
+      }
+    ],
+    "Best Time by Difficulty": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 327,
+        "nearby": [
+          "Fastest Clear",
+          "Showing the latest {count0} runs.",
+          "Show Fewer Items",
+          "Recent Runs"
         ]
       }
     ],
@@ -10807,7 +10918,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1318,
+        "line": 1350,
         "nearby": [
           "Detected",
           "Combat history is not available for this character.",
@@ -11432,7 +11543,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1201,
+        "line": 1233,
         "nearby": [
           "Actions",
           "Save",
@@ -12300,7 +12411,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Inventory type",
           "Backpack",
@@ -12824,7 +12935,7 @@
     "Checking deleted character history...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Recover Deleted Character",
           "The player must be offline.",
@@ -13650,7 +13761,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Filter by name, item ID, or template",
           "Filter Inventory",
@@ -13660,7 +13771,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1205,
+        "line": 1237,
         "nearby": [
           "No inventory items match this filter.",
           "No inventory items were found.",
@@ -13670,7 +13781,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1217,
+        "line": 1249,
         "nearby": [
           "Filter by name, recipe ID, source, or category",
           "Filter Crafting Schematics",
@@ -13680,7 +13791,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1244,
+        "line": 1276,
         "nearby": [
           "Filter by name, item key, type, or product group",
           "Filter Research Schematics",
@@ -13690,7 +13801,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Filter by name, ID, status, or dependency",
           "Filter Journey Browser",
@@ -13700,7 +13811,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Manual Template",
           "T1_ExtraSeat",
@@ -13947,7 +14058,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1208,
         "nearby": [
           "Player admin layout",
           "Player Summary",
@@ -14107,6 +14218,16 @@
           "Choose how to download",
           "Blueprint"
         ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 388,
+        "nearby": [
+          "Show All {count0} Items",
+          "Identity",
+          "Platform Identity",
+          "Database Identity"
+        ]
       }
     ],
     "Close JSON editor": [
@@ -14245,7 +14366,7 @@
     "Collapse": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1130,
+        "line": 1143,
         "nearby": [
           "Result",
           "Action",
@@ -14664,7 +14785,7 @@
     "Combat history is not available for this character.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1317,
+        "line": 1349,
         "nearby": [
           "ies",
           "Detected",
@@ -14848,9 +14969,9 @@
     "Complete": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 711,
+        "line": 723,
         "nearby": [
-          "Give Multiple Items",
+          "Continue",
           "Complete Journey Node",
           "Player",
           "Node"
@@ -14858,7 +14979,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1140,
+        "line": 1153,
         "nearby": [
           "Expand",
           "Unknown",
@@ -14870,10 +14991,10 @@
     "Complete Journey Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 710,
+        "line": 722,
         "nearby": [
-          "Give Item",
-          "Give Multiple Items",
+          "Unverified Game Build",
+          "Continue",
           "Complete",
           "Player"
         ]
@@ -15776,27 +15897,15 @@
         ]
       }
     ],
-    "Continue With Discord": [
+    "Continue": [
       {
-        "file": "console/web/src/features/auth/DiscordSetupWizard.tsx",
-        "line": 387,
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 712,
         "nearby": [
-          "Application Saved. Continue with Discord to choose your server and access roles.",
-          "Authorize Discord to choose a server you own and configure member access. You can also sign in with your Console password.",
-          "Edit App",
-          "Signed in with Discord as"
-        ]
-      }
-    ],
-    "Continue With Tailscale": [
-      {
-        "file": "console/web/src/features/auth/HttpsSetup.tsx",
-        "line": 96,
-        "nearby": [
-          "Tailscale Serve is configured. Open the address from a device on your tailnet to check the connection.",
-          "Open HTTPS Console",
-          "Preparing your secure address. This page updates automatically.",
-          "Sign in at the HTTPS address, then return to Settings to continue Discord setup. Your current session stays open here."
+          "Give Multiple Items",
+          "Unverified Game Build",
+          "Complete Journey Node",
+          "Complete"
         ]
       }
     ],
@@ -16299,7 +16408,7 @@
     "Crafting Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1210,
+        "line": 1242,
         "nearby": [
           "Clear",
           "No character actions have been recorded in this layout yet.",
@@ -16662,10 +16771,12 @@
     "Currency": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 230,
+        "line": 242,
         "nearby": [
-          "Platform Identity",
-          "Database Identity"
+          "Hydration",
+          "Spice Addiction",
+          "Map",
+          "Guild"
         ]
       }
     ],
@@ -16740,7 +16851,7 @@
     "Current Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 335,
+        "line": 336,
         "nearby": [
           "Recover Deleted Character",
           "Recover Character",
@@ -16921,7 +17032,7 @@
     "Currently Active": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 501,
+        "line": 524,
         "nearby": [
           "Next",
           "Last",
@@ -17196,7 +17307,7 @@
     "Danger Zone": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1369,
+        "line": 1401,
         "nearby": [
           "Map Servers",
           "Repair Vehicles",
@@ -17302,11 +17413,10 @@
     "Database Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 222,
+        "line": 397,
         "nearby": [
-          "Repair Faction",
-          "Platform Identity",
-          "Currency"
+          "Close dialog",
+          "Platform Identity"
         ]
       }
     ],
@@ -17492,7 +17602,7 @@
     "DB Player": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 139,
+        "line": 174,
         "nearby": [
           "Funcom ID",
           "FLS ID",
@@ -18479,7 +18589,7 @@
     "Deleted character to recover": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.",
           "No recoverable deleted character was detected.",
@@ -18495,7 +18605,7 @@
         "nearby": [
           "Active Players",
           "PvP",
-          "No players are currently online."
+          "Dungeon Runs"
         ]
       }
     ],
@@ -18673,7 +18783,7 @@
     "Depends On": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1095,
+        "line": 1108,
         "nearby": [
           "Name",
           "Type",
@@ -18983,7 +19093,7 @@
     "Detected": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1218,
+        "line": 1250,
         "nearby": [
           "{count0} of {count1}",
           "Schematic",
@@ -18993,7 +19103,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1245,
+        "line": 1277,
         "nearby": [
           "Research Entr",
           "ies",
@@ -19003,7 +19113,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Journey Entr",
           "ies",
@@ -19026,7 +19136,7 @@
     "Detected Event": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 337,
+        "line": 338,
         "nearby": [
           "Current Character",
           "Recover From",
@@ -19092,6 +19202,18 @@
           "Clean Build Cache removes unused build cache. Docker protects active builds, containers, images, volumes, databases, game files, and backups.",
           "Open the relevant service logs for recent context.",
           "Token Mismatch Detected"
+        ]
+      }
+    ],
+    "Difficulty": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 220,
+        "nearby": [
+          "Dungeon",
+          "All Dungeons",
+          "All Difficulties",
+          "Refresh"
         ]
       }
     ],
@@ -19709,7 +19831,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1296,
+        "line": 1328,
         "nearby": [
           "Leave empty for now.",
           "Save",
@@ -20903,6 +21025,108 @@
         ]
       }
     ],
+    "Dungeon": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 216,
+        "nearby": [
+          "Refresh",
+          "Dungeon Runs View",
+          "All Dungeons",
+          "Difficulty"
+        ]
+      }
+    ],
+    "Dungeon Runs": [
+      {
+        "file": "console/web/src/features/players/PlayersPanel.tsx",
+        "line": 42,
+        "nearby": [
+          "Deleted Characters",
+          "PvP",
+          "No players are currently online.",
+          "No offline players were found."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 280,
+        "nearby": [
+          "Skill Points",
+          "Available Intel",
+          "Faction",
+          "Alignment"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 319,
+        "nearby": [
+          "Player Must Be Offline",
+          "Repair Faction",
+          "Dungeons",
+          "Highest Difficulty"
+        ]
+      }
+    ],
+    "Dungeon runs aren't available on this database version.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 207,
+        "nearby": [
+          "No player matches that name.",
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs couldn't be loaded.",
+          "Refresh"
+        ]
+      }
+    ],
+    "Dungeon runs couldn't be loaded.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 209,
+        "nearby": [
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs aren't available on this database version.",
+          "Refresh",
+          "Dungeon Runs View"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 244,
+        "nearby": [
+          "Clear",
+          "Showing runs for",
+          "Loading dungeon runs…",
+          "{count0} dungeon and difficulty pairs · {count1} runs"
+        ]
+      }
+    ],
+    "Dungeon Runs View": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 215,
+        "nearby": [
+          "Dungeon runs couldn't be loaded.",
+          "Refresh",
+          "Dungeon",
+          "All Dungeons"
+        ]
+      }
+    ],
+    "Dungeons": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 321,
+        "nearby": [
+          "Repair Faction",
+          "Dungeon Runs",
+          "Highest Difficulty",
+          "Fastest Clear"
+        ]
+      }
+    ],
     "duplicated coordinate": [
       {
         "file": "console/web/src/features/bases/BaseLandClaimTab.tsx",
@@ -21068,7 +21292,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1201,
+        "line": 1233,
         "nearby": [
           "Save",
           "Cancel",
@@ -21933,7 +22157,7 @@
     "Enforcement": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1400,
+        "line": 1429,
         "nearby": [
           "Ban Player",
           "Player",
@@ -22195,7 +22419,7 @@
     "Equipped and carried gear durability. Relog required.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Repair Gear",
           "The player must be offline.",
@@ -22235,7 +22459,7 @@
     "Est. Rank": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 197,
+        "line": 298,
         "nearby": [
           "Faction Standings",
           "Rep",
@@ -22580,7 +22804,7 @@
     "Expand": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1130,
+        "line": 1143,
         "nearby": [
           "Action",
           "Collapse",
@@ -23097,10 +23321,10 @@
     "Faction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 186,
+        "line": 287,
         "nearby": [
-          "Hydration",
-          "Spice Addiction",
+          "Available Intel",
+          "Dungeon Runs",
           "Alignment",
           "Faction Standings"
         ]
@@ -23131,7 +23355,7 @@
     "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1196,
+        "line": 1228,
         "nearby": [
           "Give Faction Reputation",
           "About Faction Reputation",
@@ -23143,7 +23367,7 @@
     "Faction Standings": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 191,
+        "line": 292,
         "nearby": [
           "Faction",
           "Alignment",
@@ -23288,6 +23512,18 @@
           "True",
           "Loading",
           "Queued"
+        ]
+      }
+    ],
+    "Fastest Clear": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 323,
+        "nearby": [
+          "Dungeons",
+          "Highest Difficulty",
+          "Showing the latest {count0} runs.",
+          "Best Time by Difficulty"
         ]
       }
     ],
@@ -23449,7 +23685,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 376,
+        "line": 399,
         "nearby": [
           "Players",
           "Players view",
@@ -23482,6 +23718,26 @@
         ]
       }
     ],
+    "Filter by Character Name or Actor ID": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 234,
+        "nearby": [
+          "All Difficulties",
+          "Refresh",
+          "Search"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 235,
+        "nearby": [
+          "Refresh",
+          "Search",
+          "Clear"
+        ]
+      }
+    ],
     "Filter by container group": [
       {
         "file": "console/web/src/features/bases/BaseInventoryTab.tsx",
@@ -23509,7 +23765,7 @@
     "Filter by name, ID, status, or dependency": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Journey Browser",
           "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.",
@@ -23533,7 +23789,7 @@
     "Filter by name, item ID, or template": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "A relog is required to see the change.",
           "of",
@@ -23557,7 +23813,7 @@
     "Filter by name, item key, type, or product group": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1243,
+        "line": 1275,
         "nearby": [
           "Research Schematics",
           "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.",
@@ -23569,7 +23825,7 @@
     "Filter by name, recipe ID, source, or category": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1216,
+        "line": 1248,
         "nearby": [
           "Crafting Schematics",
           "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
@@ -23593,7 +23849,7 @@
     "Filter Crafting Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1216,
+        "line": 1248,
         "nearby": [
           "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
           "Filter by name, recipe ID, source, or category",
@@ -23641,7 +23897,7 @@
     "Filter Inventory": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "of",
           "Filter by name, item ID, or template",
@@ -23677,7 +23933,7 @@
     "Filter Journey Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.",
           "Filter by name, ID, status, or dependency",
@@ -23764,7 +24020,7 @@
     "Filter Research Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1243,
+        "line": 1275,
         "nearby": [
           "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.",
           "Filter by name, item key, type, or product group",
@@ -24020,7 +24276,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 457,
+        "line": 480,
         "nearby": [
           "of",
           "Rows",
@@ -24043,6 +24299,16 @@
         "line": 547,
         "nearby": [
           "Showing {count0}-{count1} of {count2} items.",
+          "Rows",
+          "Previous",
+          "Page"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 283,
+        "nearby": [
+          "of",
           "Rows",
           "Previous",
           "Page"
@@ -24256,7 +24522,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 136,
+        "line": 171,
         "nearby": [
           "Platform ID",
           "Funcom ID",
@@ -24610,7 +24876,7 @@
     "Funcom ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 135,
+        "line": 170,
         "nearby": [
           "Platform ID",
           "FLS ID",
@@ -25360,7 +25626,7 @@
     "Give Faction Reputation": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1196,
+        "line": 1228,
         "nearby": [
           "About Give Intel",
           "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.",
@@ -25372,7 +25638,7 @@
     "Give Intel": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1227,
         "nearby": [
           "Give Water",
           "Refill Container",
@@ -25384,17 +25650,17 @@
     "Give Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 408,
+        "line": 409,
         "nearby": [
           "Items Retained",
           "Sietch",
           "Give Multiple Items",
-          "Complete Journey Node"
+          "Unverified Game Build"
         ]
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Aug. Grade",
           "Give Package",
@@ -25436,7 +25702,7 @@
     "Give Items": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "About Faction Reputation",
           "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.",
@@ -25448,12 +25714,12 @@
     "Give Multiple Items": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 408,
+        "line": 409,
         "nearby": [
           "Sietch",
           "Give Item",
-          "Complete Journey Node",
-          "Complete"
+          "Unverified Game Build",
+          "Continue"
         ]
       }
     ],
@@ -25471,7 +25737,7 @@
     "Give Package": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Augments",
           "Aug. Grade",
@@ -25495,7 +25761,7 @@
     "Give Water": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1185,
+        "line": 1217,
         "nearby": [
           "Close",
           "Player admin sections",
@@ -25636,7 +25902,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Selected Item",
           "Quantity",
@@ -25646,7 +25912,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Item ID",
           "Quantity",
@@ -25737,7 +26003,7 @@
     "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Give Item",
           "Add Item",
@@ -26211,7 +26477,7 @@
     "Group Entry": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Researching...",
           "Researched",
@@ -26223,7 +26489,7 @@
     "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Loading research...",
           "No research entries found for this filter.",
@@ -26255,12 +26521,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 163,
+        "line": 261,
         "nearby": [
-          "Solari Coin",
+          "Currency",
           "Map",
-          "Level",
-          "XP"
+          "Identity",
+          "Level"
         ]
       },
       {
@@ -26392,9 +26658,9 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 180,
+        "line": 228,
         "nearby": [
-          "Available Intel",
+          "Solari Coin",
           "Vitals",
           "Hydration",
           "Spice Addiction"
@@ -26486,7 +26752,7 @@
     "Hide Inactive Players After": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 385,
+        "line": 408,
         "nearby": [
           "Offline",
           "Banned",
@@ -26495,15 +26761,15 @@
         ]
       }
     ],
-    "Hide Password Form": [
+    "Highest Difficulty": [
       {
-        "file": "console/web/src/App.tsx",
-        "line": 1152,
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 322,
         "nearby": [
-          "Beyond the Dunes, Every Choice Shapes the Future",
-          "Sign In With Discord",
-          "Use Console Password",
-          "Restart the Console to enable Discord sign in."
+          "Dungeon Runs",
+          "Dungeons",
+          "Fastest Clear",
+          "Showing the latest {count0} runs."
         ]
       }
     ],
@@ -26864,12 +27130,12 @@
     "Hydration": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 181,
+        "line": 232,
         "nearby": [
           "Vitals",
           "Health",
           "Spice Addiction",
-          "Faction"
+          "Currency"
         ]
       }
     ],
@@ -26904,6 +27170,28 @@
         ]
       }
     ],
+    "Identity": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 265,
+        "nearby": [
+          "Map",
+          "Guild",
+          "Level",
+          "XP"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 387,
+        "nearby": [
+          "Show Fewer Items",
+          "Show All {count0} Items",
+          "Close dialog",
+          "Platform Identity"
+        ]
+      }
+    ],
     "Idle · Monitoring": [
       {
         "file": "console/web/src/features/adminTools/AdminToolsPanel.tsx",
@@ -26919,7 +27207,7 @@
     "ies": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1245,
+        "line": 1277,
         "nearby": [
           "{count0} of {count1}",
           "Research Entr",
@@ -26929,7 +27217,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Clear",
           "Journey Entr",
@@ -28012,7 +28300,7 @@
     "Inventory type": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Edit",
           "Remove",
@@ -28307,7 +28595,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Preview",
           "Item Name",
@@ -28418,7 +28706,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.",
           "Preview",
@@ -28566,7 +28854,7 @@
     "Items ·": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "No recoverable deleted character was detected.",
           "Deleted character to recover",
@@ -28600,7 +28888,7 @@
     "Items Retained": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Recover From",
           "Detected Event",
@@ -28658,7 +28946,7 @@
     "Journey Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Save",
           "Discard",
@@ -28670,7 +28958,7 @@
     "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Discard",
           "Journey Browser",
@@ -28682,7 +28970,7 @@
     "Journey Entr": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1316,
+        "line": 1348,
         "nearby": [
           "Filter Journey Browser",
           "Clear",
@@ -28999,7 +29287,17 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1383,
+        "line": 1202,
+        "nearby": [
+          "Loading journey data...",
+          "Teleport",
+          "Player admin layout",
+          "Player Summary"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1412,
         "nearby": [
           "Queue",
           "Repair Login Queue",
@@ -29250,7 +29548,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 461,
+        "line": 484,
         "nearby": [
           "of",
           "Next",
@@ -29276,6 +29574,14 @@
           "Next",
           "Unsaved Change",
           "Save or discard your changes before leaving Bot Items."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 287,
+        "nearby": [
+          "of",
+          "Next"
         ]
       }
     ],
@@ -29510,6 +29816,14 @@
     ],
     "Leaderboard": [
       {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 15,
+        "nearby": [
+          "All Runs",
+          "No player matches that name."
+        ]
+      },
+      {
         "file": "console/web/src/features/players/CombatPanel.tsx",
         "line": 52,
         "nearby": [
@@ -29544,7 +29858,7 @@
     "Leave empty for now.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1296,
+        "line": 1328,
         "nearby": [
           "Reload",
           "Select Skill School",
@@ -29580,7 +29894,7 @@
     "Less than 1m": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 513,
+        "line": 536,
         "nearby": [
           "{count0}h {count1}m",
           "{count0}m"
@@ -29623,6 +29937,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 273,
+        "nearby": [
+          "Guild",
+          "Identity",
+          "XP",
+          "Skill Points"
+        ]
+      },
+      {
         "file": "console/web/src/features/players/SpecializationTab.tsx",
         "line": 361,
         "nearby": [
@@ -29630,16 +29954,6 @@
           "XP",
           "Keystone",
           "Add XP"
-        ]
-      },
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 169,
-        "nearby": [
-          "Map",
-          "Guild",
-          "XP",
-          "Skill Points"
         ]
       }
     ],
@@ -30084,7 +30398,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1319,
+        "line": 1351,
         "nearby": [
           "Combat history is not available for this character.",
           "Blueprints",
@@ -30280,6 +30594,46 @@
         ]
       }
     ],
+    "Loading dungeon runs…": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 245,
+        "nearby": [
+          "Showing runs for",
+          "Dungeon runs couldn't be loaded.",
+          "{count0} dungeon and difficulty pairs · {count1} runs"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 256,
+        "nearby": [
+          "{count0} dungeon and difficulty pairs · {count1} runs",
+          "No runs match these filters.",
+          "No dungeon runs recorded."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 261,
+        "nearby": [
+          "No runs match these filters.",
+          "No dungeon runs recorded.",
+          "{count0} of {count1} runs · Newest First",
+          "{count0} runs · Newest First"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 271,
+        "nearby": [
+          "{count0} of {count1} runs · Newest First",
+          "{count0} runs · Newest First",
+          "No runs match these filters.",
+          "No dungeon runs recorded."
+        ]
+      }
+    ],
     "Loading Encrypted API Access...": [
       {
         "file": "console/web/src/features/settings/EncryptedApiSection.tsx",
@@ -30330,12 +30684,12 @@
     "Loading journey data...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1147,
+        "line": 1160,
         "nearby": [
           "The game manages related rewards, schematics, and tags.",
           "Read-only",
-          "Player admin layout",
-          "Player Summary"
+          "Teleport",
+          "Kick Player"
         ]
       }
     ],
@@ -30585,7 +30939,7 @@
     "Loading recipes...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1035,
+        "line": 1048,
         "nearby": [
           "Restore",
           "Modules",
@@ -30597,7 +30951,7 @@
     "Loading research...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1060,
+        "line": 1073,
         "nearby": [
           "Unlocked",
           "Unlock",
@@ -30835,7 +31189,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1221,
+        "line": 1253,
         "nearby": [
           "Schematic",
           "Detected",
@@ -30845,7 +31199,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1249,
+        "line": 1281,
         "nearby": [
           "Detected",
           "All Product Groups",
@@ -30855,7 +31209,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1280,
+        "line": 1312,
         "nearby": [
           "Unsaved Change",
           "Restore Starter Skills",
@@ -31018,7 +31372,7 @@
     "Loadout": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Backpack",
           "Character",
@@ -31382,7 +31736,7 @@
     "Manual Template": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1410,
+        "line": 1439,
         "nearby": [
           "Spawn Vehicle",
           "Manual Vehicle ID",
@@ -31392,7 +31746,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Manual Vehicle ID",
           "Sandbike",
@@ -31413,7 +31767,7 @@
     "Manual Vehicle ID": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1410,
+        "line": 1439,
         "nearby": [
           "Movement / Vehicles",
           "Spawn Vehicle",
@@ -31423,7 +31777,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Spawn",
           "Advanced manual override",
@@ -31503,12 +31857,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 162,
+        "line": 260,
         "nearby": [
-          "Solari Credit",
-          "Solari Coin",
+          "Spice Addiction",
+          "Currency",
           "Guild",
-          "Level"
+          "Identity"
         ]
       }
     ],
@@ -31660,7 +32014,7 @@
     "Map Servers": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1345,
+        "line": 1377,
         "nearby": [
           "Repair Vehicles",
           "Threshold",
@@ -32309,7 +32663,7 @@
     "Mentat starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 971,
+        "line": 984,
         "nearby": [
           "Type:",
           "Trooper starter skills",
@@ -32703,7 +33057,7 @@
     "Modules": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1009,
+        "line": 1022,
         "nearby": [
           "Restore Starter Skills",
           "Restore",
@@ -32721,6 +33075,18 @@
           "Less",
           "This addon is installed locally but is no longer listed in the community catalog.",
           "This addon is deprecated and may stop receiving updates."
+        ]
+      }
+    ],
+    "More than one player matches. Enter the full character name or actor ID.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 34,
+        "nearby": [
+          "All Runs",
+          "No player matches that name.",
+          "Dungeon runs aren't available on this database version.",
+          "Dungeon runs couldn't be loaded."
         ]
       }
     ],
@@ -32763,7 +33129,7 @@
     "Movement / Vehicles": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1410,
+        "line": 1439,
         "nearby": [
           "Wipe Inventory",
           "Reset Progression",
@@ -32819,7 +33185,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1092,
+        "line": 1105,
         "nearby": [
           "Repair Unlock",
           "Research",
@@ -33170,7 +33536,7 @@
     "Never": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 391,
+        "line": 414,
         "nearby": [
           "Banned",
           "Hide Inactive Players After",
@@ -33466,7 +33832,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 460,
+        "line": 483,
         "nearby": [
           "Page",
           "of",
@@ -33501,6 +33867,15 @@
           "of",
           "Last",
           "Unsaved Change"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 286,
+        "nearby": [
+          "Page",
+          "of",
+          "Last"
         ]
       }
     ],
@@ -33629,7 +34004,7 @@
     "No admin actions have been recorded in this layout yet.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "T1_ExtraSeat",
           "Clear"
@@ -33687,7 +34062,7 @@
     "No banned players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 307,
+        "line": 320,
         "nearby": [
           "No players are currently online.",
           "No offline players were found.",
@@ -33829,7 +34204,7 @@
     "No character actions have been recorded in this layout yet.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1205,
+        "line": 1237,
         "nearby": [
           "No inventory items were found.",
           "Clear",
@@ -33947,7 +34322,7 @@
     "No crafting recipes found for this category.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1035,
+        "line": 1048,
         "nearby": [
           "Modules",
           "Loading recipes...",
@@ -34024,6 +34399,27 @@
           "No Preview Available",
           "View Full 3D Blueprint",
           "No public Blueprints match these filters."
+        ]
+      }
+    ],
+    "No dungeon runs recorded.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 256,
+        "nearby": [
+          "Loading dungeon runs…",
+          "No runs match these filters.",
+          "{count0} of {count1} runs · Newest First"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 271,
+        "nearby": [
+          "Loading dungeon runs…",
+          "No runs match these filters.",
+          "Showing",
+          "of"
         ]
       }
     ],
@@ -34126,7 +34522,7 @@
     "No inventory items match this filter.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Filter Inventory",
           "Clear",
@@ -34137,7 +34533,7 @@
     "No inventory items were found.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Clear",
           "No inventory items match this filter.",
@@ -34406,9 +34802,9 @@
     "No offline players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 305,
+        "line": 318,
         "nearby": [
-          "PvP",
+          "Dungeon Runs",
           "No players are currently online.",
           "No banned players were found.",
           "No players have been found yet."
@@ -34528,6 +34924,18 @@
         ]
       }
     ],
+    "No player matches that name.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 34,
+        "nearby": [
+          "Leaderboard",
+          "All Runs",
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs aren't available on this database version."
+        ]
+      }
+    ],
     "No player sell listings on this exchange.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
@@ -34543,10 +34951,10 @@
     "No players are currently online.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 303,
+        "line": 316,
         "nearby": [
-          "Deleted Characters",
           "PvP",
+          "Dungeon Runs",
           "No offline players were found.",
           "No banned players were found."
         ]
@@ -34579,7 +34987,7 @@
     "No players have been found yet.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 308,
+        "line": 321,
         "nearby": [
           "No offline players were found.",
           "No banned players were found.",
@@ -34731,7 +35139,7 @@
     "No recoverable deleted character was detected.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Checking deleted character history...",
           "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.",
@@ -34743,7 +35151,7 @@
     "No research entries found for this filter.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1060,
+        "line": 1073,
         "nearby": [
           "Unlock",
           "Loading research...",
@@ -34761,6 +35169,27 @@
           "Search",
           "Change",
           "Rank"
+        ]
+      }
+    ],
+    "No runs match these filters.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 256,
+        "nearby": [
+          "{count0} dungeon and difficulty pairs · {count1} runs",
+          "Loading dungeon runs…",
+          "No dungeon runs recorded."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 271,
+        "nearby": [
+          "{count0} runs · Newest First",
+          "Loading dungeon runs…",
+          "No dungeon runs recorded.",
+          "Showing"
         ]
       }
     ],
@@ -34999,7 +35428,7 @@
     "Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 712,
+        "line": 724,
         "nearby": [
           "Complete",
           "Player",
@@ -35009,7 +35438,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 736,
+        "line": 749,
         "nearby": [
           "Reset",
           "Player",
@@ -35564,7 +35993,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Unique schematics",
           "A relog is required to see the change.",
@@ -35856,7 +36285,7 @@
     "Offline": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 380,
+        "line": 403,
         "nearby": [
           "All Players",
           "Online",
@@ -36183,7 +36612,7 @@
     "Online": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 379,
+        "line": 402,
         "nearby": [
           "Status filtering isn't available on this database version",
           "All Players",
@@ -37299,7 +37728,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 459,
+        "line": 482,
         "nearby": [
           "First",
           "Previous",
@@ -37320,6 +37749,16 @@
       {
         "file": "console/web/src/features/exchange/BotItemsTab.tsx",
         "line": 549,
+        "nearby": [
+          "First",
+          "Previous",
+          "of",
+          "Next"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 285,
         "nearby": [
           "First",
           "Previous",
@@ -38314,7 +38753,7 @@
     "Planetologist starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 978,
+        "line": 991,
         "nearby": [
           "Trooper starter skills",
           "Mentat starter skills",
@@ -38326,7 +38765,7 @@
     "Platform ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 130,
+        "line": 165,
         "nearby": [
           "Funcom ID",
           "FLS ID"
@@ -38336,12 +38775,11 @@
     "Platform Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 216,
+        "line": 391,
         "nearby": [
-          "Player Must Be Offline",
-          "Repair Faction",
-          "Database Identity",
-          "Currency"
+          "Identity",
+          "Close dialog",
+          "Database Identity"
         ]
       }
     ],
@@ -38358,7 +38796,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 298,
+        "line": 300,
         "nearby": [
           "Repair Landsraad Quests",
           "Repair Quests",
@@ -38368,7 +38806,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 712,
+        "line": 724,
         "nearby": [
           "Complete Journey Node",
           "Complete",
@@ -38378,7 +38816,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 736,
+        "line": 749,
         "nearby": [
           "Reset Journey Node",
           "Reset",
@@ -38388,7 +38826,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1375,
+        "line": 1407,
         "nearby": [
           "Repair Login Queue",
           "Repair Queue",
@@ -38397,7 +38835,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1389,
+        "line": 1418,
         "nearby": [
           "Unban Player",
           "Ban Player"
@@ -38405,7 +38843,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1399,
+        "line": 1428,
         "nearby": [
           "Ban Player",
           "Enforcement",
@@ -38466,7 +38904,7 @@
     "Player Admin Actions": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Blueprints",
           "Loading Bases",
@@ -38478,10 +38916,10 @@
     "Player admin layout": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1207,
         "nearby": [
-          "Read-only",
-          "Loading journey data...",
+          "Teleport",
+          "Kick Player",
           "Player Summary",
           "Close"
         ]
@@ -38490,7 +38928,7 @@
     "Player admin sections": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1178,
+        "line": 1210,
         "nearby": [
           "Player Summary",
           "Close",
@@ -38562,7 +39000,7 @@
     "Player Controller": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 141,
+        "line": 176,
         "nearby": [
           "DB Player",
           "Account",
@@ -38609,12 +39047,12 @@
     "Player Must Be Offline": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 207,
+        "line": 308,
         "nearby": [
           "Restore earned faction progression and synchronize reputation.",
           "Repairing…",
           "Repair Faction",
-          "Platform Identity"
+          "Dungeon Runs"
         ]
       }
     ],
@@ -38686,7 +39124,7 @@
     "Player State": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 142,
+        "line": 177,
         "nearby": [
           "Account",
           "Player Controller",
@@ -38698,9 +39136,9 @@
     "Player Summary": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1208,
         "nearby": [
-          "Loading journey data...",
+          "Kick Player",
           "Player admin layout",
           "Close",
           "Player admin sections"
@@ -38763,7 +39201,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 347,
+        "line": 366,
         "nearby": [
           "No banned players were found.",
           "No players have been found yet.",
@@ -38772,7 +39210,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 365,
+        "line": 388,
         "nearby": [
           "Players view",
           "Filter"
@@ -38849,7 +39287,7 @@
     "Players view": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 350,
+        "line": 369,
         "nearby": [
           "No players have been found yet.",
           "Players"
@@ -38857,7 +39295,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 368,
+        "line": 391,
         "nearby": [
           "Players",
           "Filter",
@@ -39349,7 +39787,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Add Item",
           "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.",
@@ -39507,7 +39945,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 458,
+        "line": 481,
         "nearby": [
           "Rows",
           "First",
@@ -39528,6 +39966,16 @@
       {
         "file": "console/web/src/features/exchange/BotItemsTab.tsx",
         "line": 548,
+        "nearby": [
+          "Rows",
+          "First",
+          "Page",
+          "of"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 284,
         "nearby": [
           "Rows",
           "First",
@@ -40040,8 +40488,8 @@
         "nearby": [
           "Active Players",
           "Deleted Characters",
-          "No players are currently online.",
-          "No offline players were found."
+          "Dungeon Runs",
+          "No players are currently online."
         ]
       },
       {
@@ -40182,7 +40630,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Give Items",
           "Selected Item",
@@ -40192,7 +40640,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1199,
+        "line": 1231,
         "nearby": [
           "Item Name",
           "Item ID",
@@ -40280,7 +40728,7 @@
     "Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1376,
+        "line": 1408,
         "nearby": [
           "Repair Queue",
           "Player",
@@ -40680,12 +41128,12 @@
     "Read-only": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1142,
+        "line": 1155,
         "nearby": [
           "Reset",
           "The game manages related rewards, schematics, and tags.",
           "Loading journey data...",
-          "Player admin layout"
+          "Teleport"
         ]
       }
     ],
@@ -41029,6 +41477,17 @@
         ]
       }
     ],
+    "Recent Runs": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 351,
+        "nearby": [
+          "Best Time by Difficulty",
+          "Show Fewer Items",
+          "Show All {count0} Items"
+        ]
+      }
+    ],
     "Recipe": [
       {
         "file": "console/web/src/lib/display.ts",
@@ -41055,7 +41514,7 @@
     "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1212,
+        "line": 1244,
         "nearby": [
           "No character actions have been recorded in this layout yet.",
           "Crafting Schematics",
@@ -41195,7 +41654,7 @@
     "Recover Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 332,
+        "line": 333,
         "nearby": [
           "Player",
           "Recover Deleted Character",
@@ -41205,7 +41664,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Items ·",
           "Unknown Date",
@@ -41217,7 +41676,7 @@
     "Recover Deleted Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 331,
+        "line": 332,
         "nearby": [
           "Repair Quests",
           "Player",
@@ -41227,7 +41686,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.",
           "Repair",
@@ -41239,7 +41698,7 @@
     "Recover From": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 336,
+        "line": 337,
         "nearby": [
           "Recover Character",
           "Current Character",
@@ -41497,7 +41956,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1186,
+        "line": 1218,
         "nearby": [
           "Player admin sections",
           "Give Water",
@@ -41836,7 +42295,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 400,
+        "line": 423,
         "nearby": [
           "1 Month",
           "2 Months",
@@ -42324,7 +42783,7 @@
     "Reload": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1221,
+        "line": 1253,
         "nearby": [
           "Detected",
           "Loading...",
@@ -42334,7 +42793,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1249,
+        "line": 1281,
         "nearby": [
           "All Product Groups",
           "Loading...",
@@ -42344,7 +42803,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1280,
+        "line": 1312,
         "nearby": [
           "Restore Starter Skills",
           "Loading...",
@@ -42469,7 +42928,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1201,
+        "line": 1233,
         "nearby": [
           "Cancel",
           "Edit",
@@ -42853,7 +43312,7 @@
     "Rep": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 196,
+        "line": 297,
         "nearby": [
           "Alignment",
           "Faction Standings",
@@ -42865,7 +43324,7 @@
     "Repair": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Player Admin Actions",
           "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.",
@@ -42877,7 +43336,7 @@
     "Repair Below": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "About Repair Vehicle Durability",
           "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.",
@@ -42889,7 +43348,7 @@
     "Repair Faction": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Unknown Date",
           "Recover Character",
@@ -42899,19 +43358,19 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 207,
+        "line": 308,
         "nearby": [
           "Repairing…",
           "Player Must Be Offline",
-          "Platform Identity",
-          "Database Identity"
+          "Dungeon Runs",
+          "Dungeons"
         ]
       }
     ],
     "Repair Gear": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
           "Repair Quests",
@@ -42921,7 +43380,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "The player must be offline.",
           "Equipped and carried gear durability. Relog required.",
@@ -42933,7 +43392,7 @@
     "Repair Landsraad Quests": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 296,
+        "line": 298,
         "nearby": [
           "Solari Credit",
           "Scrip",
@@ -42943,7 +43402,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Restores earned story progression and synchronizes reputation. Relog required.",
           "Repair Faction",
@@ -42955,7 +43414,7 @@
     "Repair Login Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1371,
+        "line": 1403,
         "nearby": [
           "Repair Vehicles",
           "Danger Zone",
@@ -42965,7 +43424,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1380,
+        "line": 1412,
         "nearby": [
           "Player",
           "Queue",
@@ -42977,7 +43436,7 @@
     "Repair Quests": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 297,
+        "line": 299,
         "nearby": [
           "Scrip",
           "Repair Landsraad Quests",
@@ -42987,7 +43446,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "The player must be offline.",
           "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
@@ -42998,7 +43457,7 @@
     "Repair Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1372,
+        "line": 1404,
         "nearby": [
           "Danger Zone",
           "Repair Login Queue",
@@ -43010,7 +43469,7 @@
     "Repair Unlock": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Researched",
           "Group Entry",
@@ -43022,7 +43481,7 @@
     "Repair Vehicle Durability": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Equipped and carried gear durability. Relog required.",
           "Repair Gear",
@@ -43032,7 +43491,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1341,
+        "line": 1373,
         "nearby": [
           "The player must be offline.",
           "Repairs eligible modules and restarts only their affected running maps.",
@@ -43044,7 +43503,7 @@
     "Repair Vehicles": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1342,
+        "line": 1374,
         "nearby": [
           "Repairs eligible modules and restarts only their affected running maps.",
           "Repair Vehicle Durability",
@@ -43054,7 +43513,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1369,
+        "line": 1401,
         "nearby": [
           "Threshold",
           "Map Servers",
@@ -43066,7 +43525,7 @@
     "Repairing...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "No research entries found for this filter.",
           "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.",
@@ -43078,7 +43537,7 @@
     "Repairing…": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 207,
+        "line": 308,
         "nearby": [
           "The player must be fully offline before their faction state can be repaired.",
           "Restore earned faction progression and synchronize reputation.",
@@ -43090,7 +43549,7 @@
     "Repairs eligible modules and restarts only their affected running maps.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Vehicle durability repair threshold percent",
           "The player must be offline.",
@@ -43114,7 +43573,7 @@
     "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Repair Vehicle Durability",
           "About Repair Vehicle Durability",
@@ -43126,7 +43585,7 @@
     "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Repair Landsraad Quests",
           "The player must be offline.",
@@ -43369,7 +43828,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Group Entry",
           "Repair Unlock",
@@ -43381,7 +43840,7 @@
     "Research Entr": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1245,
+        "line": 1277,
         "nearby": [
           "Clear",
           "{count0} of {count1}",
@@ -43393,7 +43852,7 @@
     "Research Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1237,
+        "line": 1269,
         "nearby": [
           "Loading...",
           "Reload",
@@ -43405,7 +43864,7 @@
     "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1239,
+        "line": 1271,
         "nearby": [
           "Reload",
           "Research Schematics",
@@ -43417,7 +43876,7 @@
     "Researched": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Repairing...",
           "Researching...",
@@ -43429,7 +43888,7 @@
     "Researching...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1085,
         "nearby": [
           "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.",
           "Repairing...",
@@ -43487,7 +43946,7 @@
     "Reset": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 734,
+        "line": 747,
         "nearby": [
           "Node",
           "Reset Journey Node",
@@ -43496,7 +43955,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1141,
+        "line": 1154,
         "nearby": [
           "Unknown",
           "Complete",
@@ -43576,7 +44035,7 @@
     "Reset Journey Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 733,
+        "line": 746,
         "nearby": [
           "Player",
           "Node",
@@ -43609,7 +44068,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1410,
+        "line": 1439,
         "nearby": [
           "Ban Player",
           "Wipe Inventory",
@@ -44488,7 +44947,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1007,
+        "line": 1020,
         "nearby": [
           "Swordmaster starter skills",
           "Restore Starter Skills",
@@ -44753,7 +45212,7 @@
     "Restore earned faction progression and synchronize reputation.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 205,
+        "line": 306,
         "nearby": [
           "Story Limit",
           "The player must be fully offline before their faction state can be repaired.",
@@ -44812,7 +45271,7 @@
     "Restore Starter Skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1006,
+        "line": 1019,
         "nearby": [
           "Bene Gesserit starter skills",
           "Swordmaster starter skills",
@@ -44822,7 +45281,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1279,
+        "line": 1311,
         "nearby": [
           "The player must be online to change skills or restore starter skills.",
           "Unsaved Change",
@@ -44892,7 +45351,7 @@
     "Restores earned story progression and synchronizes reputation. Relog required.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Repair Faction",
           "The player must be offline.",
@@ -44915,7 +45374,7 @@
     "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "The player must be offline.",
           "Checking deleted character history...",
@@ -45048,7 +45507,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1122,
+        "line": 1135,
         "nearby": [
           "Status",
           "Tags",
@@ -45694,7 +46153,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 452,
+        "line": 475,
         "nearby": [
           "Showing",
           "of",
@@ -45723,13 +46182,13 @@
         ]
       },
       {
-        "file": "console/web/src/features/database/DatabaseSchemaBrowser.tsx",
-        "line": 133,
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 278,
         "nearby": [
-          "Clear schema filter",
-          "Table",
-          "Column",
-          "Type"
+          "Showing",
+          "of",
+          "First",
+          "Previous"
         ]
       }
     ],
@@ -46225,7 +46684,7 @@
     "Sandbike": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Advanced manual override",
           "Manual Vehicle ID",
@@ -46319,7 +46778,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1201,
+        "line": 1233,
         "nearby": [
           "Aug. Grade",
           "Actions",
@@ -46329,7 +46788,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1296,
+        "line": 1328,
         "nearby": [
           "Select Skill School",
           "Leave empty for now.",
@@ -47769,7 +48228,7 @@
     "Schematic": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1218,
+        "line": 1250,
         "nearby": [
           "Clear",
           "{count0} of {count1}",
@@ -47805,7 +48264,7 @@
     "Scrip": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 205,
+        "line": 208,
         "nearby": [
           "Admin",
           "Solari Credit",
@@ -47926,7 +48385,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 416,
+        "line": 439,
         "nearby": [
           "Refresh",
           "Search Character, FLS ID, Account ID, or Actor ID",
@@ -48014,7 +48473,7 @@
     "Search Character, FLS ID, Account ID, or Actor ID": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 414,
+        "line": 437,
         "nearby": [
           "2 Months",
           "Refresh",
@@ -48763,7 +49222,7 @@
     "Select Skill School": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1291,
+        "line": 1323,
         "nearby": [
           "Loading...",
           "Reload",
@@ -48817,7 +49276,7 @@
     "Selected Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1230,
         "nearby": [
           "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.",
           "Give Items",
@@ -50028,6 +50487,18 @@
         ]
       }
     ],
+    "Show All {count0} Items": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 372,
+        "nearby": [
+          "Recent Runs",
+          "Show Fewer Items",
+          "Identity",
+          "Close dialog"
+        ]
+      }
+    ],
     "Show Bulk Delete Controls": [
       {
         "file": "console/web/src/features/vehicles/VehicleStorageOverlay.tsx",
@@ -50081,6 +50552,26 @@
           "View Contents",
           "Show all {count0} items",
           "No containers match this filter."
+        ]
+      }
+    ],
+    "Show Fewer Items": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 349,
+        "nearby": [
+          "Showing the latest {count0} runs.",
+          "Best Time by Difficulty",
+          "Recent Runs"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 372,
+        "nearby": [
+          "Recent Runs",
+          "Show All {count0} Items",
+          "Identity"
         ]
       }
     ],
@@ -50168,7 +50659,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 449,
+        "line": 472,
         "nearby": [
           "Search",
           "Clear",
@@ -50184,6 +50675,16 @@
           "Clear",
           "of",
           "rows."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 275,
+        "nearby": [
+          "No runs match these filters.",
+          "No dungeon runs recorded.",
+          "of",
+          "Rows"
         ]
       }
     ],
@@ -50252,6 +50753,30 @@
           "New",
           "Rows",
           "First"
+        ]
+      }
+    ],
+    "Showing runs for": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 241,
+        "nearby": [
+          "Search",
+          "Clear",
+          "Dungeon runs couldn't be loaded.",
+          "Loading dungeon runs…"
+        ]
+      }
+    ],
+    "Showing the latest {count0} runs.": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 325,
+        "nearby": [
+          "Highest Difficulty",
+          "Fastest Clear",
+          "Best Time by Difficulty",
+          "Show Fewer Items"
         ]
       }
     ],
@@ -50356,7 +50881,7 @@
     "Sietch": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 339,
+        "line": 340,
         "nearby": [
           "Detected Event",
           "Items Retained",
@@ -50695,7 +51220,7 @@
     "Skill Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1274,
+        "line": 1306,
         "nearby": [
           "Reload",
           "Skill Point Controls",
@@ -50719,7 +51244,7 @@
     "Skill Point Controls": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1270,
+        "line": 1302,
         "nearby": [
           "Loading...",
           "Reload",
@@ -50731,12 +51256,12 @@
     "Skill Points": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 171,
+        "line": 277,
         "nearby": [
           "Level",
           "XP",
           "Available Intel",
-          "Vitals"
+          "Dungeon Runs"
         ]
       }
     ],
@@ -50933,19 +51458,19 @@
     "Solari Coin": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 149,
+        "line": 184,
         "nearby": [
           "Player State",
           "Solari Credit",
-          "Map",
-          "Guild"
+          "Vitals",
+          "Health"
         ]
       }
     ],
     "Solari Credit": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 205,
+        "line": 208,
         "nearby": [
           "Vehicles",
           "Admin",
@@ -50955,12 +51480,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 148,
+        "line": 183,
         "nearby": [
           "Player Controller",
           "Player State",
           "Solari Coin",
-          "Map"
+          "Vitals"
         ]
       }
     ],
@@ -51069,7 +51594,7 @@
     "Spawn": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Manual Vehicle ID",
           "Manual Template",
@@ -51090,7 +51615,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1410,
+        "line": 1439,
         "nearby": [
           "Reset Progression",
           "Movement / Vehicles",
@@ -51161,12 +51686,12 @@
     "Spice Addiction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 182,
+        "line": 236,
         "nearby": [
           "Health",
           "Hydration",
-          "Faction",
-          "Alignment"
+          "Currency",
+          "Map"
         ]
       }
     ],
@@ -51682,7 +52207,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1096,
+        "line": 1109,
         "nearby": [
           "Type",
           "Depends On",
@@ -51753,7 +52278,7 @@
     "Status filtering isn't available on this database version": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 377,
+        "line": 400,
         "nearby": [
           "Players view",
           "Filter",
@@ -52142,7 +52667,7 @@
     "Story Limit": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 199,
+        "line": 300,
         "nearby": [
           "Rep",
           "Est. Rank",
@@ -52457,7 +52982,7 @@
     "Swordmaster starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 992,
+        "line": 1005,
         "nearby": [
           "Planetologist starter skills",
           "Bene Gesserit starter skills",
@@ -52619,7 +53144,7 @@
     "T1_ExtraSeat": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1422,
+        "line": 1451,
         "nearby": [
           "Sandbike",
           "Manual Template",
@@ -52688,7 +53213,7 @@
     "Tags": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1097,
+        "line": 1110,
         "nearby": [
           "Depends On",
           "Status",
@@ -52925,6 +53450,16 @@
       }
     ],
     "Teleport": [
+      {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1201,
+        "nearby": [
+          "Read-only",
+          "Loading journey data...",
+          "Kick Player",
+          "Player admin layout"
+        ]
+      },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
         "line": 934,
@@ -53884,7 +54419,7 @@
     "The game manages related rewards, schematics, and tags.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1142,
+        "line": 1155,
         "nearby": [
           "Complete",
           "Reset",
@@ -54234,7 +54769,7 @@
     "The player must be fully offline before their faction state can be repaired.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 205,
+        "line": 306,
         "nearby": [
           "Est. Rank",
           "Story Limit",
@@ -54269,7 +54804,7 @@
     "The player must be offline.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Repair",
           "Recover Deleted Character",
@@ -54279,7 +54814,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Repair Below",
           "Vehicle durability repair threshold percent",
@@ -54291,7 +54826,7 @@
     "The player must be online to change skills or restore starter skills.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1276,
+        "line": 1308,
         "nearby": [
           "Skill Browser",
           "Use Restore Starter Skills after a progression reset leaves the starting tree locked.",
@@ -55279,7 +55814,7 @@
     "Threshold": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1344,
+        "line": 1376,
         "nearby": [
           "Repair Vehicle Durability",
           "Repair Vehicles",
@@ -55973,7 +56508,7 @@
     "Trooper starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 964,
+        "line": 977,
         "nearby": [
           "Node",
           "Type:",
@@ -56181,7 +56716,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1093,
+        "line": 1106,
         "nearby": [
           "Research",
           "Name",
@@ -56290,7 +56825,7 @@
     "Type:": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 854,
+        "line": 867,
         "nearby": [
           "Player",
           "Node",
@@ -56404,7 +56939,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 503,
+        "line": 526,
         "nearby": [
           "Last",
           "Currently Active",
@@ -56434,7 +56969,7 @@
     "Unban Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1415,
         "nearby": [
           "Repair Login Queue",
           "Kick Player",
@@ -56443,7 +56978,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1387,
+        "line": 1416,
         "nearby": [
           "Kick Player",
           "Player",
@@ -56452,7 +56987,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1404,
+        "line": 1433,
         "nearby": [
           "Player",
           "Enforcement",
@@ -56544,7 +57079,7 @@
     "Unique schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1204,
+        "line": 1236,
         "nearby": [
           "Character",
           "Loadout",
@@ -56713,7 +57248,7 @@
     "Unknown Date": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Deleted character to recover",
           "Items ·",
@@ -56819,7 +57354,7 @@
     "Unlock": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1051,
+        "line": 1064,
         "nearby": [
           "Unlocking...",
           "Unlocked",
@@ -56831,7 +57366,7 @@
     "Unlocked": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1051,
+        "line": 1064,
         "nearby": [
           "No crafting recipes found for this category.",
           "Unlocking...",
@@ -56852,7 +57387,7 @@
     "Unlocking...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1051,
+        "line": 1064,
         "nearby": [
           "Loading recipes...",
           "No crafting recipes found for this category.",
@@ -56934,7 +57469,7 @@
     "Unsaved Change": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1278,
+        "line": 1310,
         "nearby": [
           "Use Restore Starter Skills after a progression reset leaves the starting tree locked.",
           "The player must be online to change skills or restore starter skills.",
@@ -57107,6 +57642,18 @@
           "Review Setup -> Server Identity and Network/Ports for Local vs Public mode.",
           "Clean Images removes unused images across this Docker host, including development images. Container and startup images are protected.",
           "Unused Docker build cache can be cleaned"
+        ]
+      }
+    ],
+    "Unverified Game Build": [
+      {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 712,
+        "nearby": [
+          "Give Item",
+          "Give Multiple Items",
+          "Continue",
+          "Complete Journey Node"
         ]
       }
     ],
@@ -57775,7 +58322,7 @@
     "Use Restore Starter Skills after a progression reset leaves the starting tree locked.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1276,
+        "line": 1308,
         "nearby": [
           "Skill Point Controls",
           "Skill Browser",
@@ -57799,7 +58346,7 @@
     "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1353,
         "nearby": [
           "Loading Bases",
           "Player Admin Actions",
@@ -58104,7 +58651,7 @@
     "Vehicle durability repair threshold percent": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1334,
+        "line": 1366,
         "nearby": [
           "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.",
           "Repair Below",
@@ -58514,10 +59061,10 @@
     "Vitals": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 178,
+        "line": 226,
         "nearby": [
-          "Skill Points",
-          "Available Intel",
+          "Solari Credit",
+          "Solari Coin",
           "Health",
           "Hydration"
         ]
@@ -59015,7 +59562,7 @@
     "Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 392,
+        "line": 415,
         "nearby": [
           "Hide Inactive Players After",
           "Never",
@@ -59210,7 +59757,7 @@
     "Wipe Inventory": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1407,
+        "line": 1436,
         "nearby": [
           "Unban Player",
           "Ban Player",
@@ -59364,6 +59911,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 275,
+        "nearby": [
+          "Identity",
+          "Level",
+          "Skill Points",
+          "Available Intel"
+        ]
+      },
+      {
         "file": "console/web/src/features/players/SpecializationTab.tsx",
         "line": 360,
         "nearby": [
@@ -59371,16 +59928,6 @@
           "Track",
           "Level",
           "Keystone"
-        ]
-      },
-      {
-        "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 170,
-        "nearby": [
-          "Guild",
-          "Level",
-          "Skill Points",
-          "Available Intel"
         ]
       }
     ],
