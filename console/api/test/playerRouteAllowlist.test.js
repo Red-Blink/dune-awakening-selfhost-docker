@@ -39,6 +39,9 @@ const LEAKS = [
   "/api/players/abc123/ban",
   "/api/players/abc123/character-recovery",
   "/api/players/abc123/unknown-new-resource",
+  "/api/dungeons/runs",
+  "/api/dungeons/leaderboard",
+  "/api/players/abc123/dungeons",
   "/api/players/abc123/inventory/extra",
 ];
 
