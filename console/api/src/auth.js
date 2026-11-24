@@ -204,6 +204,22 @@ export function createAuth(config) {
     return session;
   }
 
+  // #1355 live re-validation support. Copies only: callers never receive the live object.
+  function listSessions() {
+    const out = [];
+    for (const session of sessions.values()) out.push({ id: session.id, userId: session.userId || "", tier: session.tier, scope: session.scope || null });
+    return out;
+  }
+
+  // Changes the tier of a live session in place (a role was added or removed in Discord).
+  function setSessionTier(id, tier) {
+    const session = sessions.get(id);
+    if (!session || session.tier === tier) return false;
+    session.tier = tier;
+    if (!session.scope) persistSessions(true);
+    return true;
+  }
+
   function revokeSession(req) {
     const raw = parseCookies(req?.headers?.cookie || "").get("asc_session");
     if (!raw) return;
@@ -319,7 +335,7 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, readSessionById, revokeSession, peekSession, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
+  return { makeSession, readSession, readSessionById, revokeSession, peekSession, listSessions, setSessionTier, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
 export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {
