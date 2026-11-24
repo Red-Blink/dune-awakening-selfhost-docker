@@ -35,6 +35,7 @@ import { API_ROUTE_DOMAINS, createExactRouteIndex } from "./http/routeTable.js";
 import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { createSecondFactorStore } from "./auth/secondFactorStore.js";
 import { generateTotpSecret, provisioningUri, provisioningQrDataUri, verifyTotpMatch } from "./auth/totp.js";
+import { createSessionRevalidator } from "./integrations/discord/sessionRevalidator.js";
 import { createPendingStateStore, exchangeDiscordAuthCode, fetchDiscordIdentity, createOAuthTierResolver, buildAuthorizeUrl, oauthStateCookie, clearOAuthStateCookie, constantTimeStringEqual, oauthCallbackFailure } from "./integrations/discord/oauth.js";
 import { createHandoff } from "./integrations/discord/handoff.js";
 import { roleTiersConfigured, roleTierConflicts, describeRoleTierConflicts, parseRoleIdList } from "./integrations/discord/roleTiers.js";
@@ -439,6 +440,17 @@ const resolveOAuthTier = createOAuthTierResolver({
   roleTiers: config.discordConsoleRoleTiers,
   requireMfaTiers: config.discordOAuthRequireMfaTiers
 });
+// #1355: live re-validation. A Discord session's tier used to be fixed until it expired; this
+// re-checks each signed-in user's Discord identity and roles every DISCORD_SESSION_REVALIDATE_SECONDS
+// (default 30, 0 = off) and revokes or demotes at once. Tokens are held in memory only.
+const sessionRevalidator = createSessionRevalidator({
+  auth,
+  fetchIdentity: (accessToken) => fetchDiscordIdentity({ accessToken, homeGuildId: config.discordHomeGuildId, apiBaseUrl: config.discordOAuthApiBaseUrl }),
+  resolveTier: (identity) => resolveOAuthTier(identity),
+  intervalMs: config.discordSessionRevalidateMs,
+  audit: (event, data) => audit(config, "/internal/session-revalidate", event, { ok: event !== "auth.session.revoked", ...data })
+});
+if (!config.discordOAuthDisabled) sessionRevalidator.start();
 // True when Discord sign-in can produce ANY tier: a handoff, a role mapping, or
 // an enabled owner allowlist. With none of these the callback denies early
 // rather than sending the user on a Discord round-trip that must fail.
@@ -9232,6 +9244,7 @@ async function handleOAuthCallback(req, res) {
   // during the flow do not linger against a user who ultimately succeeds.
   oauthCallbackRateLimiter.recordSuccess(rateKey);
   const session = auth.makeSession({ tier: resolved.tier, userId: identity.userId, username: identity.username, displayName: identity.displayName, guildId: config.discordHomeGuildId });
+  sessionRevalidator.remember(session.id, token.access_token);
   res.setHeader("Set-Cookie", [sessionCookieValue(session, config), clearOAuthStateCookie()]);
   // #584: every OTHER branch of this callback (failure or denial) already
   // audits userId; only the success row omitted it -- a granted session

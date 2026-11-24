@@ -207,6 +207,15 @@ function sessionMaxAgeMs(value) {
   return minutes === 0 ? 0 : Math.max(5, minutes) * 60 * 1000;
 }
 
+// #1355: seconds. Unset = 30. "0" turns live re-validation off. Positive values are raised to
+// at least 5 so a typo cannot hammer Discord's API for every signed-in user.
+function sessionRevalidateMs(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return 30 * 1000;
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return 30 * 1000;
+  return seconds === 0 ? 0 : Math.max(5, seconds) * 1000;
+}
+
 function portValue(value, fallback) {
   const parsed = Number(value || fallback);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
@@ -307,6 +316,7 @@ export function loadConfig() {
     // shouldn't) carry every operator-set game-server value.
     totpIssuer: APP_NAME,
     // #1355: absolute cap on a Discord-derived session (roles re-resolved at the next sign-in). 0 = off.
+    discordSessionRevalidateMs: sessionRevalidateMs(process.env.DISCORD_SESSION_REVALIDATE_SECONDS),
     discordSessionMaxAgeMs: sessionMaxAgeMs(process.env.DISCORD_SESSION_MAX_AGE_MINUTES),
     enrollmentSessionTtlMs: 10 * 60 * 1000, // §4: short-lived, non-renewable enrollment session
     adminPasswordEnvManaged,

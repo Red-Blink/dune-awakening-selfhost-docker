@@ -541,8 +541,22 @@ are read again, so a change takes effect at the next sign-in at the latest.
 * The console password sign-in is not affected.
 * The first start after updating signs existing Discord users out once, so they
   pick up the cap.
-* The cap is the longest a removed role can keep working. If that is too long for
-  you, set a shorter value (down to 5 minutes).
+* The cap is the longest a removed role can keep working if live re-checking
+  (below) is turned off.
+
+**Live re-check.** While someone is signed in, the console also asks Discord
+every 30 seconds whether they still hold a console role. If a role was removed,
+or they left or were banned from your server, the session ends within about a
+minute (two checks in a row, so one Discord hiccup cannot sign people out); if
+they moved to a lower role they are demoted straight away.
+
+* Change the interval with `DISCORD_SESSION_REVALIDATE_SECONDS` in `.env`
+  (default `30`, minimum `5`, `0` turns live re-checking off).
+* The console keeps each person's Discord access token in memory only. It is
+  never written to disk, so a console restart signs Discord users out once
+  (they sign in again with a quick redirect).
+* If Discord cannot be reached, signed-in users keep working for up to
+  5 minutes, then are signed out. Console-password sign-ins are not affected.
 
 ## Questions operators ask
 
