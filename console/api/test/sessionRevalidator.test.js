@@ -54,10 +54,12 @@ test("a demotion applies immediately", async () => {
   assert.equal(sessions.get("s1").tier, "player");
 });
 
-test("a revoked Discord token (401/403/404) revokes at once", async () => {
+test("a rejected Discord token (401/403/404) revokes on the second sweep (a Discord-side IP ban must not sign everyone out on one blip)", async () => {
   for (const code of [401, 403, 404]) {
     const { rev, sessions, r } = rig();
     r.fetchIdentity = async () => { throw Object.assign(new Error("x"), { upstreamStatus: code }); };
+    await rev.sweep();
+    assert.ok(sessions.has("s1"), `${code} first strike`);
     await rev.sweep();
     assert.ok(!sessions.has("s1"), String(code));
   }
@@ -105,4 +107,23 @@ test("tokens for ended sessions are dropped", async () => {
   sessions.delete("s1");
   await rev.sweep();
   assert.equal(rev._tokens.size, 0);
+});
+
+test("handoff outages (http_5xx, http_429, malformed_response) are transient, not role removals", async () => {
+  for (const reason of ["http_502", "http_503", "http_429", "malformed_response"]) {
+    const { rev, sessions, r } = rig();
+    r.resolveTier = async () => ({ tier: "", source: "handoff", reason });
+    await rev.sweep(); await rev.sweep(); await rev.sweep();
+    assert.ok(sessions.has("s1"), reason);
+  }
+});
+
+test("a failed member-role lookup (Discord outage/rate limit) is transient, then ends after the grace window", async () => {
+  const { rev, sessions, r, advance } = rig();
+  r.fetchIdentity = async () => ({ userId: "u1", roleIds: [], roleLookupFailed: true });
+  r.resolveTier = async () => ({ tier: "", source: "roles", reason: "not_authorized" });
+  await rev.sweep(); await rev.sweep(); await rev.sweep();
+  assert.ok(sessions.has("s1"));
+  advance(6 * 60 * 1000); await rev.sweep();
+  assert.ok(!sessions.has("s1"));
 });
