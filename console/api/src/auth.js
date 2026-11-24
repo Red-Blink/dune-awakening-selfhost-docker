@@ -207,7 +207,10 @@ export function createAuth(config) {
   // #1355 live re-validation support. Copies only: callers never receive the live object.
   function listSessions() {
     const out = [];
-    for (const session of sessions.values()) out.push({ id: session.id, userId: session.userId || "", tier: session.tier, scope: session.scope || null });
+    for (const session of sessions.values()) {
+      if (session.expiresAt < now() || pastAbsoluteExpiry(session)) continue; // dead entries are pruned lazily; never re-check them
+      out.push({ id: session.id, userId: session.userId || "", tier: session.tier, scope: session.scope || null });
+    }
     return out;
   }
 
@@ -268,6 +271,18 @@ export function createAuth(config) {
   // "a second enrollment that loses the race gets 409" test going red on the
   // very first version of that fix. Returns the number of sessions
   // invalidated.
+  // Discord sign-in was disabled or forgotten: every Discord-derived session ends with it.
+  function invalidateDiscordSessions() {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (!session.userId || session.scope) continue;
+      sessions.delete(id);
+      count++;
+    }
+    if (count) persistSessions(true);
+    return count;
+  }
+
   function invalidatePasswordSessions(exceptId) {
     let count = 0;
     for (const [id, session] of sessions) {
@@ -335,7 +350,7 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, readSessionById, revokeSession, peekSession, listSessions, setSessionTier, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
+  return { makeSession, readSession, readSessionById, revokeSession, peekSession, listSessions, setSessionTier, invalidateDiscordSessions, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
 export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {

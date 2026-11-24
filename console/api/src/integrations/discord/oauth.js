@@ -289,6 +289,7 @@ export async function fetchDiscordIdentity({ accessToken, homeGuildId = "", apiB
   // when a home guild is configured and the user is in it; a 403/404 here means
   // "not a member" and yields no roles rather than failing sign-in.
   let roleIds = [];
+  let roleLookupFailed = false;
   if (/^\d{17,19}$/.test(homeGuildId) && guildIds.includes(homeGuildId)) {
     try {
       const member = await discordJsonRequest(`${apiBaseUrl}/users/@me/guilds/${homeGuildId}/member`, {
@@ -305,10 +306,11 @@ export async function fetchDiscordIdentity({ accessToken, homeGuildId = "", apiB
       // (403/404) already does. Every failure shape here is equally
       // recoverable this way, so catch broadly rather than re-narrowing the
       // condition.
+      if (![403, 404].includes(Number(error?.upstreamStatus))) roleLookupFailed = true; // outage/rate limit, not "not a member"
       console.warn(`Discord member-role lookup failed (${error?.upstreamStatus || "network/response error"}), degrading to no roles for this sign-in: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
-  return { userId, username, displayName, guildIds, guilds: guildList, ownedGuildIds, roleIds, mfaEnabled };
+  return { userId, username, displayName, guildIds, guilds: guildList, ownedGuildIds, roleIds, mfaEnabled, ...(roleLookupFailed ? { roleLookupFailed: true } : {}) };
 }
 
 // ---- Tier decision (Phase 3: signed handoff, authoritative when configured) ----

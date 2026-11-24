@@ -472,7 +472,8 @@ const sessionRevalidator = createSessionRevalidator({
   intervalMs: config.discordSessionRevalidateMs,
   audit: (event, data) => audit(config, "/internal/session-revalidate", event, { ok: event !== "auth.session.revoked", ...data })
 });
-if (!config.discordOAuthDisabled) sessionRevalidator.start();
+if (config.discordOAuthDisabled) auth.invalidateDiscordSessions(); // persisted sessions from before the disable
+else sessionRevalidator.start();
 // True when Discord sign-in can produce ANY tier: a handoff, a role mapping, or
 // an enabled owner allowlist. With none of these the callback denies early
 // rather than sending the user on a Discord round-trip that must fail.
@@ -5162,6 +5163,7 @@ async function discordOAuthDisableRoute(req, res) {
   // still accepts Discord sign-in after this route has already responded
   // "disabled."
   discordOAuthSoftDisabledInProcess = true;
+  auth.invalidateDiscordSessions(); // a Discord session must not outlive "Disable Discord sign-in"
   await updateEnvFileValue("DISCORD_OAUTH_DISABLED", "1");
   audit(config, auditUrl, ACTION, { ok: true, ...actor });
   return json(res, 200, { ok: true, restartRequired: true });
@@ -5246,6 +5248,7 @@ async function discordOAuthForgetRoute(req, res) {
   // discordOAuthForgottenInProcess's own comment.
   discordOAuthSoftDisabledInProcess = true;
   discordOAuthForgottenInProcess = true;
+  auth.invalidateDiscordSessions();
   // #676 §6.4: log the pre-wipe NON-secret fields (never the secret itself)
   // so a mistaken "Forget" has a recoverable record -- the secret is the only
   // piece an operator can always regenerate from Discord's own portal; the

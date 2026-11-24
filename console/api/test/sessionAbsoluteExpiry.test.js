@@ -67,3 +67,20 @@ test("the absolute expiry survives a restart and cannot be stripped from the sto
     } finally { rmSync(fresh.dir, { recursive: true, force: true }); }
   } finally { rmSync(h.dir, { recursive: true, force: true }); }
 });
+
+test("listSessions hides dead sessions; invalidateDiscordSessions ends only Discord sessions (and survives a restart)", () => {
+  const h = harness();
+  try {
+    const d = h.auth.makeSession({ tier: "admin", userId: "u1", username: "n", guildId: "g" });
+    const p = h.auth.makeSession({ tier: "owner" });
+    assert.deepEqual(h.auth.listSessions().map((x) => x.id).sort(), [d.id, p.id].sort());
+    h.advance(61 * 60 * 1000);
+    assert.ok(!h.auth.listSessions().some((x) => x.id === d.id), "a session past its absolute cap is not re-checked");
+    const d2 = h.auth.makeSession({ tier: "moderator", userId: "u2", username: "m", guildId: "g" });
+    assert.equal(h.auth.invalidateDiscordSessions(), 1);
+    assert.equal(h.auth.readSessionById(d2.id), null);
+    assert.ok(h.auth.readSessionById(p.id), "password sessions are untouched");
+    const again = createAuth(h.config);
+    assert.equal(again.readSessionById(d2.id), null, "removal reached the persisted store");
+  } finally { rmSync(h.dir, { recursive: true, force: true }); }
+});
