@@ -102,7 +102,12 @@ export function sanitizeSkinProfile(raw: unknown): DuneSkinProfile {
   design.panelOpacity = clampNumber(design.panelOpacity, 0.35, 1, DEFAULT_DESIGN_TOKENS.panelOpacity);
   design.fontScale = clampNumber(design.fontScale, 0.85, 1.25, DEFAULT_DESIGN_TOKENS.fontScale);
   design.headingTracking = clampNumber(design.headingTracking, -0.05, 0.25, DEFAULT_DESIGN_TOKENS.headingTracking);
-  if (!(design.fontPreset in DEFAULT_FONT_STACKS)) design.fontPreset = "inter";
+  if (typeof design.fontPreset !== "string" || !Object.hasOwn(DEFAULT_FONT_STACKS, design.fontPreset)) {
+    design.fontPreset = DEFAULT_DESIGN_TOKENS.fontPreset;
+  }
+  for (const field of ["customBgImageUrl", "customBrandTitle", "customBrandSubtitle"] as const) {
+    if (typeof design[field] !== "string") design[field] = DEFAULT_DESIGN_TOKENS[field];
+  }
 
   const shell = {
     ...DEFAULT_SHELL_LAYOUT,
@@ -431,7 +436,11 @@ export function clearSkinDomOverrides(root: HTMLElement = document.documentEleme
   delete root.dataset.skinId;
 }
 
+const pendingPalette = new WeakMap<HTMLElement, symbol>();
+
 export function applySkinProfile(skin: DuneSkinProfile, root: HTMLElement = document.documentElement): void {
+  const request = Symbol();
+  pendingPalette.set(root, request);
   // 1. Apply color palette (either custom 4-color generator + overrides or built-in theme)
   if (skin.customColors.enabled) {
     root.dataset.theme = `skin-${skin.id}`;
@@ -448,6 +457,7 @@ export function applySkinProfile(skin: DuneSkinProfile, root: HTMLElement = docu
       Object.entries(cached.tokens).forEach(([name, value]) => root.style.setProperty(name, value));
     }
     void import("../themes/themeEngine").then((engine) => {
+      if (pendingPalette.get(root) !== request) return;
       const base = engine.buildThemeTokens({
         background: skin.customColors.background,
         panel: skin.customColors.panel,
@@ -489,7 +499,9 @@ export function applySkinProfile(skin: DuneSkinProfile, root: HTMLElement = docu
         // ignore
       }
     } else {
-      void import("../themes/themeEngine").then((engine) => engine.applyTheme(targetTheme, root)).catch(() => {});
+      void import("../themes/themeEngine").then((engine) => {
+        if (pendingPalette.get(root) === request) engine.applyTheme(targetTheme, root);
+      }).catch(() => {});
     }
   }
 

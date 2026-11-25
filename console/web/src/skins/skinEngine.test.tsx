@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultSkinProfile, BUILTIN_SKIN_PRESETS } from "./skinDefaults";
 import {
   applySkinProfile,
@@ -42,6 +42,22 @@ describe("Skin & Layout Engine", () => {
     applySkinProfile(skin);
     expect(document.documentElement.dataset.skinId).toBeUndefined();
     expect(document.documentElement.getAttribute("style") ?? "").toBe("");
+  });
+
+  it("can apply and reload imported skins with malformed design text fields", () => {
+    const imported = importSkinFromJson(JSON.stringify({
+      id: "imported", design: { customBgImageUrl: null, customBrandTitle: 42, customBrandSubtitle: [], fontPreset: "constructor" },
+    }));
+    saveAndApplySkin(imported);
+    expect(loadActiveSkin().design).toEqual(createDefaultSkinProfile().design);
+  });
+
+  it("keeps the default palette after resetting a pending custom palette", async () => {
+    saveAndApplySkin(BUILTIN_SKIN_PRESETS.find((skin) => skin.customColors.enabled)!);
+    saveAndApplySkin(createDefaultSkinProfile());
+    await vi.dynamicImportSettled();
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("");
   });
 
   it("applies custom macro shell layout, custom colors, and typography", () => {
