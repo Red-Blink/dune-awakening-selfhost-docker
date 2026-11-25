@@ -46,13 +46,13 @@ export function installPreview(){
  banner.append(message,link);document.body.prepend(banner);document.title='Try the Console · Dune Docker';
  const markControls=()=>{
   document.querySelectorAll<HTMLButtonElement>('button').forEach(button=>{
-   if(button.closest('.sidebar-nav,.playerAdmin_tabs,.playerAdmin_iconRailItems')||button.matches('.playerAdmin_toggleHeader')||button.hasAttribute('aria-expanded')||button.getAttribute('role')==='tab')return;
+   if(button.closest('.sidebar-nav,.playerAdmin_tabs,.playerAdmin_iconRailItems,.skin-studio-modal,.skin-layout-zone-banner,.skin-widget-toolbar,.skin-widget-collapsed-bar,.skin-custom-dashboard-toolbar,.skin-custom-dashboard-empty,.skin-active-groups-bar,.skin-group-prompt-modal,.skin-add-cross-widget-bar')||button.matches('.playerAdmin_toggleHeader,.skin-exit-edit-pill,.skin-studio-shortcut')||button.hasAttribute('aria-expanded')||button.getAttribute('role')==='tab')return;
    const label=button.textContent||button.getAttribute('aria-label')||'';
    if(isManagementAction(label)){button.disabled=true;button.title='Preview Only — server management actions are disabled.';}
   });
   document.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>('input,textarea,select').forEach(field=>{
    const label=[field.getAttribute('aria-label'),field.getAttribute('placeholder'),field.getAttribute('name'),field.closest('label')?.textContent].join(' ');
-   if(field.closest('.live-map-layers,.live-map-layer,.language-picker,.segmented-control,.database-schema-select,.playerAdmin_filterToolsRow,.combat-row-control')||/search|filter|page size|rows per|sort|select service|select map|category|schema|target|school/i.test(label)||field.getAttribute('type')==='search')return;
+   if(field.closest('.live-map-layers,.live-map-layer,.language-picker,.segmented-control,.database-schema-select,.playerAdmin_filterToolsRow,.combat-row-control,.skin-studio-modal,.skin-widget-toolbar,.skin-layout-zone-banner,.skin-custom-dashboard-toolbar,.skin-active-groups-bar,.skin-group-prompt-modal,.skin-add-cross-widget-bar')||/search|filter|page size|rows per|sort|select service|select map|category|schema|target|school/i.test(label)||field.getAttribute('type')==='search')return;
    if(field instanceof HTMLSelectElement||field.getAttribute('type')==='checkbox'||field.getAttribute('type')==='radio')field.disabled=true;
    else field.readOnly=true;
    field.title='Preview Only';
