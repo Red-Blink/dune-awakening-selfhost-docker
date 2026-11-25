@@ -532,6 +532,10 @@ run_now() {
   fi
 
   echo "=== Scheduled battlegroup restart ==="
+  if [ -f runtime/generated/manual-stop.env ] && dune_manual_stop_applies_to_boot runtime/generated/manual-stop.env; then
+    echo "Skipping scheduled restart: the battlegroup was manually stopped."
+    return 0
+  fi
   echo "Validating persisted Sietch and gameplay settings..."
   runtime/scripts/sietches.sh preflight
   python3 runtime/scripts/usersettings.py preflight
@@ -551,18 +555,20 @@ run_now() {
   echo "Stopping battlegroup..."
   history_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   history_started_epoch="$(date +%s)"
-  if ! runtime/scripts/stop-all.sh; then
+  runtime/scripts/stop-all.sh || {
+    rc=$?
     history_finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    runtime/scripts/restart-history.sh record battlegroup Battlegroup Scheduled "Scheduled restart" Failed "$history_started" "$history_finished" "$(( $(date +%s) - history_started_epoch ))" || true
+    runtime/scripts/restart-history.sh record battlegroup Battlegroup Scheduled "Scheduled restart failed during shutdown (exit $rc)" Failed "$history_started" "$history_finished" "$(( $(date +%s) - history_started_epoch ))" || true
     return 1
-  fi
+  }
   echo
   echo "Starting battlegroup..."
-  if ! DUNE_START_FOREGROUND_DEFERRED_RECONCILE=1 runtime/scripts/start-all.sh; then
+  DUNE_START_FOREGROUND_DEFERRED_RECONCILE=1 runtime/scripts/start-all.sh || {
+    rc=$?
     history_finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    runtime/scripts/restart-history.sh record battlegroup Battlegroup Scheduled "Scheduled restart" Failed "$history_started" "$history_finished" "$(( $(date +%s) - history_started_epoch ))" || true
+    runtime/scripts/restart-history.sh record battlegroup Battlegroup Scheduled "Scheduled restart failed during startup (exit $rc)" Failed "$history_started" "$history_finished" "$(( $(date +%s) - history_started_epoch ))" || true
     return 1
-  fi
+  }
   history_finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   runtime/scripts/restart-history.sh record battlegroup Battlegroup Scheduled "Scheduled restart" Succeeded "$history_started" "$history_finished" "$(( $(date +%s) - history_started_epoch ))" || true
   replay_spicefield_overrides_after_scheduled_restart
