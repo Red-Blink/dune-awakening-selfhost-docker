@@ -1041,7 +1041,7 @@ export function ServerPanel(props: {
       titleChanged ? `title to "${title}"` : "",
       modeChanged ? `mode to ${titleCase(serverMode)}` : ""
     ].filter(Boolean).join(" and ");
-    if ((titleChanged || modeChanged) && !(await confirmAction(`Change server ${changeList}? This saves the setting and refreshes Director/Gateway only if they are already running.${hostnameChanged ? " The hostname will be saved afterward and requires your next Battlegroup restart." : ""}`))) return;
+    if ((titleChanged || modeChanged) && !(await confirmAction(`Change server ${changeList}? ${serverSettingsRestartNotice(modeChanged)}${hostnameChanged ? " The hostname will be saved afterward and requires your next Battlegroup restart." : ""}`))) return;
     setTitleResult({ status: "running", title: "Saving Settings" });
     props.onError("");
     try {
@@ -1050,11 +1050,16 @@ export function ServerPanel(props: {
         setTitleResult({ status: "succeeded", title: "Settings Saved — Battlegroup Restart Required" });
         return;
       }
-      const final = await waitForTaskSilently((await serverApi.saveConfig({
+      const final = await waitForTaskWithUpdates((await serverApi.saveConfig({
         ...(titleChanged ? { title } : {}),
         ...(modeChanged ? { mode: serverMode } : {})
-      })).task);
+      })).task, task => {
+        if (isTerminalTask(task.status)) return;
+        const title = serverSettingsProgressTitle(task.logLines);
+        setTitleResult(previous => previous?.title === title ? previous : { status: "running", title });
+      });
       const details = taskTechnicalDetails(final);
+      if (final.status === "succeeded") setTitleResult({ status: "running", title: "Refreshing Server Status" });
       await loadControlStatus(false).catch(() => null);
       if (final.status === "succeeded") {
         if (titleChanged) setSavedServerTitle(title);
@@ -1609,6 +1614,20 @@ async function waitForTaskWithUpdates(task: Task, onUpdate: (task: Task) => void
     onUpdate(current);
   }
   return current;
+}
+
+export function serverSettingsRestartNotice(modeChanged: boolean) {
+  return modeChanged
+    ? "Changing network mode restarts Director, Gateway, Survival_1, and Overmap if running. Players on affected maps will disconnect. The change can take several minutes."
+    : "Changing the title restarts Director and Gateway if running. Restarting Director also restarts a running Survival_1 and disconnects its players.";
+}
+
+export function serverSettingsProgressTitle(lines: Pick<Task["logLines"][number], "line">[]) {
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const match = /^Restarting (director|gateway|Survival_1|Overmap) so /.exec(lines[index].line.trim());
+    if (match) return `Restarting ${match[1][0].toUpperCase()}${match[1].slice(1)}`;
+  }
+  return "Saving Settings";
 }
 
 
