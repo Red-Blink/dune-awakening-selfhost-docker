@@ -884,6 +884,10 @@ test("Partial or invalid seed language slice is not treated as 100% coverage in 
       Home: "Accueil",
       Settings: "<script>alert(1)</script>"
     });
+    // Keep the positive control complete as new English phrases enter the catalog.
+    setSeedLanguageSliceOverride("DE", Object.fromEntries(
+      allReviewed.map((phrase) => [phrase, `[DE] ${phrase.replace(/[<>]/g, "")}`])
+    ));
 
     const db = loadTranslationDatabase(config);
     assert.equal(Object.keys(db.translations.__materialized).length, 0);
