@@ -906,6 +906,8 @@ export function ServerPanel(props: {
   readiness: string;
   doctor: string;
   storageCleanupResult: HomeTaskResult | null;
+  serverConfigResult: HomeTaskResult | null;
+  setServerConfigResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   setStorageCleanupResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   storageCleanupOperation: StorageCleanupOperation;
   setStorageCleanupOperation: Dispatch<SetStateAction<StorageCleanupOperation>>;
@@ -927,12 +929,12 @@ export function ServerPanel(props: {
   const [restartEnabled, setRestartEnabled] = useState(false);
   const [restartTime, setRestartTime] = useState("05:00");
   const [scheduleResult, setScheduleResult] = useState<HomeTaskResult | null>(null);
-  const [serverTitle, setServerTitle] = useState("");
+  const [serverTitle, setServerTitle] = useState(() => findLineValue(props.status, ["title", "server title", "SERVER_TITLE"]) || "");
   const hostname = useServerHostname();
-  const [savedServerTitle, setSavedServerTitle] = useState("");
-  const [serverMode, setServerMode] = useState<ServerMode>("public");
-  const [savedServerMode, setSavedServerMode] = useState<ServerMode>("public");
-  const [titleResult, setTitleResult] = useState<HomeTaskResult | null>(null);
+  const [savedServerTitle, setSavedServerTitle] = useState(serverTitle);
+  const [serverMode, setServerMode] = useState<ServerMode>(() => normalizeServerMode(findLineValue(props.status, ["mode", "server mode", "SERVER_IP_MODE"])) || "public");
+  const [savedServerMode, setSavedServerMode] = useState<ServerMode>(serverMode);
+  const { serverConfigResult: titleResult, setServerConfigResult: setTitleResult } = props;
   const [funcomToken, setFuncomToken] = useState("");
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
   const [serviceRestartingService, setServiceRestartingService] = useState("");
@@ -1446,14 +1448,14 @@ export function ServerPanel(props: {
         <section className="action-section server-title-section">
           <h4>Server Configurations</h4>
           <div className="action-line title-action-line">
-            <label>Current Server Title<input value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
-            <label className="compact-select">Mode<select value={serverMode} onChange={(event) => setServerMode(event.target.value as ServerMode)}>
+            <label>Current Server Title<input disabled={titleSaving} value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
+            <label className="compact-select">Mode<select disabled={titleSaving} value={serverMode} onChange={(event) => setServerMode(event.target.value as ServerMode)}>
               <option value="public">Public</option>
               <option value="local">Local</option>
             </select></label>
             <ServerHostnameSetting hostname={hostname} disabled={actionRunning || serviceRestartRunning || titleSaving} />
             <button disabled={actionRunning || serviceRestartRunning || titleSaving || !hostname.ready || !hostname.valid} onClick={saveServerConfig}>Save Settings</button>
-            {titleResult && <span className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
+            {titleResult && <span role="status" className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
               <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(titleResult.title, titleResult.status === "running")}</strong>
             </span>}
           </div>

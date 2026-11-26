@@ -491,6 +491,7 @@ export function App() {
   const [backupRestoreTask, setBackupRestoreTask] = useState<Task | null>(null);
   const [homeTaskResult, setHomeTaskResult] = useState<HomeTaskResult | null>(null);
   const [storageCleanupResult, setStorageCleanupResult] = useState<HomeTaskResult | null>(null);
+  const [serverConfigResult, setServerConfigResult] = useState<HomeTaskResult | null>(null);
   const [storageCleanupOperation, setStorageCleanupOperation] = useState<StorageCleanupOperation>("");
   const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
@@ -949,6 +950,8 @@ export function App() {
             readiness={readiness}
             doctor={doctor}
             storageCleanupResult={storageCleanupResult}
+            serverConfigResult={serverConfigResult}
+            setServerConfigResult={setServerConfigResult}
             setStorageCleanupResult={setStorageCleanupResult}
             storageCleanupOperation={storageCleanupOperation}
             setStorageCleanupOperation={setStorageCleanupOperation}
@@ -1258,7 +1261,7 @@ export function App() {
           />
         )}
         {!redeploySetupOpen && !activeCustomDashboard && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
-        {!redeploySetupOpen && !activeCustomDashboard && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} serverConfigResult={serverConfigResult} setServerConfigResult={setServerConfigResult} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);
