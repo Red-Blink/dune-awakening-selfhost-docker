@@ -556,7 +556,6 @@ export function UpdatesPanel({
           ["Player Notice", enabledLabel(autoGameValues.notify_players, autoGameNotifyEnabled, `${formatAutoGameCheckpoints(autoGameValues.notify_minutes || autoGameNotifyMinutes)} Min`)],
           ["Empty Server Policy", enabledLabel(autoGameValues.wait_until_empty, autoGameWaitUntilEmpty, `max ${autoGameValues.max_wait_minutes || autoGameMaxWaitMinutes} minutes`)],
           ["Console Updates", enabledLabel(autoGameValues.update_console, autoGameUpdateConsole)],
-          ["Regis Tanks", enabledLabel(autoGameValues.manage_regis_tanks, autoGameManageTanks, "disable, then restore")],
           ["Timer", autoGameDisplayTimerLabel]
         ]} />
         {commandStatusSummary(autoGame).reason && <p className="danger-note">{commandStatusSummary(autoGame).reason}</p>}
@@ -587,8 +586,7 @@ export function UpdatesPanel({
           </section>
           <section className="auto-update-policy-group">
             <h5>Regis Tanks</h5>
-            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Disable before, restore after the update</span><strong>{autoGameManageTanks ? "Enabled" : "Disabled"}</strong><input type="checkbox" aria-label="Disable Regis Tanks before the update and restore them afterwards" disabled={autoGameSaving} checked={autoGameManageTanks} onChange={(event) => setAutoGameManageTanks(event.target.checked)} /></label>
-            <p className="muted auto-update-setting-help">If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.</p>
+            <p className="muted auto-update-setting-help">When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.</p>
             {autoGameValues.regis_tanks_restore && <p className="danger-note auto-update-setting-help">Regis Tanks restore: {autoGameValues.regis_tanks_restore}</p>}
           </section>
         </div>
@@ -643,7 +641,7 @@ function GameUpdateProgress({
   const blockedReason = gameUpdateBlockReason(task);
   if (blockedReason) return <div key={task.id} className="game-update-blocked-notice" role="status" style={{ animationDuration: `${UPDATE_RESULT_DISMISS_MS}ms` }}>
     <ShieldCheck size={18} aria-hidden="true" />
-    <div><strong>Game Update Blocked</strong><p>{blockedReason}</p></div>
+    <div><strong>Game Update Paused</strong><p>{blockedReason}</p></div>
   </div>;
   const progress = summarizeGameUpdateProgress(task);
   const running = !isTerminalTask(task.status);
@@ -694,6 +692,11 @@ function summarizeGameUpdateProgress(task: Task) {
   }
   if (task.status === "cancelled") {
     return { title: "Update Cancelled", percent: gameUpdatePercent(text), message: "The game update was cancelled. Review the update log before retrying." };
+  }
+
+  if (text.includes("DUNE_GAME_ASSETS_PHASE=Checking Regis Tank compatibility") &&
+      !text.includes("Regis Tank image verified.")) {
+    return { title: "Checking Tank Compatibility", percent: 5, message: "Preparing the new game files and verifying the Tank patch before shutdown." };
   }
 
   const fixIndex = text.lastIndexOf("Detected a common SteamCMD cache error");

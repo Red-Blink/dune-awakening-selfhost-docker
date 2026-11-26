@@ -9,8 +9,8 @@ Each supported game build has its own directory here named by build number
 manifest that pins the official image digest and every asset hash. Only 2134304
 is the original r5.8 patch; the later builds carry the r6.4 candidate patch
 rebased onto each official image (`candidateOnly: true`, `gameplayVerified:
-false` in their manifests). A game build with no matching manifest is treated as
-unsupported: Tanks cannot be enabled until a compatible patch ships.
+false` in their manifests). A new tag may also use a locally verified compatible
+build after an update with Tanks enabled.
 
 Settings → Experimental Features → Regis Tanks applies the image and
 restarts only running Hagga maps. It creates a database safety backup and copies
@@ -29,7 +29,16 @@ The six native Tank templates are offered only when enabled. Spawning requires
 an online player in a ready Hagga partition running the exact prepared image.
 Every template uses Tier 6 parts: Booster or Inventory with Dart, Rocket or Flame.
 
-Disable before a game-server update. Disabling restores the official image and
+Manual and scheduled game updates skip Tank verification when Tanks are off.
+When enabled, the updater stages Steam's incoming bundle separately, verifies
+the new world against a reviewed base, and prepares the Tank image before
+stopping Hagga. Compatibility requires a reviewed image identity or identical
+filesystem layers, operating system, architecture and container configuration
+to the trusted base. The updater then checks the patched executable and cooked
+overlays. A new tag alone does not require a rebase. An unverified update
+pauses with the current policy intact.
+The administrator can wait for a rebase or explicitly disable Tanks and retry.
+Disabling restores the official image and
 removes Tank from the spawn catalog. Existing Tanks can be deleted by the game
 without the patch; do not expect them to return after re-enabling. Never reuse these binary offsets on a new
 build. A new patch needs revalidated assets, clean/patched hashes and gameplay tests.

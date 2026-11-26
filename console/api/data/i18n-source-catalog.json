@@ -528,6 +528,7 @@
     "Checking Funcom Token",
     "Checking Public IP",
     "Checking Steam for the latest available server build.",
+    "Checking Tank Compatibility",
     "Checking available disk space before downloading files.",
     "Checking deleted character history...",
     "Checking diagnostics",
@@ -1275,9 +1276,11 @@
     "Game UDP ports start at",
     "Game Update",
     "Game Update Blocked",
+    "Game Update Paused",
     "Game Version Mismatch",
     "Game files and images are installed. The database was not touched.",
     "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.",
+    "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
     "Game.ini",
     "Gameplay Toggles",
     "Gateway",
@@ -2154,6 +2157,7 @@
     "Preparing the console update.",
     "Preparing the database volume.",
     "Preparing the game update.",
+    "Preparing the new game files and verifying the Tank patch before shutdown.",
     "Preparing the server workspace.",
     "Prevents automatic Always-On map startup from consuming the physical RAM reserved for the host. Dynamic maps requested by player travel are not subject to this check.",
     "Preview",
@@ -2321,6 +2325,7 @@
     "Region",
     "Regis Tank",
     "Regis Tanks",
+    "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.",
     "Regis Tanks in Hagga Basin",
     "Regis Tanks in the desert",
     "Regis Tanks restore:",
@@ -3383,6 +3388,7 @@
     "What Enabling and Disabling Does",
     "What should this host do?",
     "What went wrong",
+    "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.",
     "When enabled and players are online, restart requests hold in a countdown queue with in-game warnings before the server cycles. Restarts requested while no players are online run immediately.",
     "When on, the console takes a full database backup before every Market Bot write: buyback sweeps, reseeds, and NPC listing removals, scheduled or manual. Only the newest Market Bot backups are kept (DUNE_MARKET_BOT_BACKUP_KEEP, default 5). Turning this off skips those backups; existing backups are kept.",
     "Whether per-player loot is regenerated each time a player interacts with a loot container. Field-confirmed. Enabling this can make a single container farmable indefinitely.",
@@ -5214,7 +5220,7 @@
         "nearby": [
           "Regis Tanks in the desert",
           "Regis Tanks",
-          "Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted.",
+          "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
           "Restart Queued"
         ]
       }
@@ -6589,12 +6595,12 @@
     "After the game files are updated, check RedBlink for a newer Dune Docker release and install it. Without this, the Console is never updated automatically.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 586,
+        "line": 585,
         "nearby": [
           "Disabled",
           "Update the Console after a game update",
           "Regis Tanks",
-          "Disable before, restore after the update"
+          "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops."
         ]
       }
     ],
@@ -7580,7 +7586,7 @@
     "Apply update when found": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 570,
+        "line": 569,
         "nearby": [
           "min",
           "Update Action",
@@ -8644,7 +8650,7 @@
     "Backing Up Console Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 902,
+        "line": 905,
         "nearby": [
           "Preparing Console Update",
           "Downloading Console Release",
@@ -8654,7 +8660,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 990,
+        "line": 993,
         "nearby": [
           "Installing Console Release",
           "Installing the downloaded console release files.",
@@ -8666,7 +8672,7 @@
     "Backing up the current console files before replacing them.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 952,
+        "line": 955,
         "nearby": [
           "Updating Console",
           "Downloading the selected console release.",
@@ -8676,7 +8682,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 990,
+        "line": 993,
         "nearby": [
           "Installing the downloaded console release files.",
           "Backing Up Console Files",
@@ -10507,7 +10513,7 @@
     "Building Web Console": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 905,
+        "line": 908,
         "nearby": [
           "Installing Console Release",
           "Verifying Console Release",
@@ -11927,7 +11933,7 @@
     "Check for updates every": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 566,
+        "line": 565,
         "nearby": [
           "OFF",
           "Schedule",
@@ -12082,7 +12088,7 @@
       },
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 83,
+        "line": 86,
         "nearby": [
           "Updating...",
           "Unknown",
@@ -12094,7 +12100,7 @@
     "Checking available disk space before downloading files.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 802,
+        "line": 805,
         "nearby": [
           "Downloading updated game server files.",
           "Stopping game servers before replacing server files.",
@@ -12149,7 +12155,7 @@
     "Checking Steam for the latest available server build.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 803,
+        "line": 806,
         "nearby": [
           "Stopping game servers before replacing server files.",
           "Checking available disk space before downloading files.",
@@ -12166,6 +12172,18 @@
           "Verifying Server Status...",
           "This may take a few seconds while Docker and Dune complete their health checks.",
           "Server Status Unavailable"
+        ]
+      }
+    ],
+    "Checking Tank Compatibility": [
+      {
+        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
+        "line": 699,
+        "nearby": [
+          "Update Cancelled",
+          "The game update was cancelled. Review the update log before retrying.",
+          "Preparing the new game files and verifying the Tank patch before shutdown.",
+          "Fixing SteamCMD"
         ]
       }
     ],
@@ -12228,7 +12246,7 @@
       },
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 74,
+        "line": 77,
         "nearby": [
           "Steam did not finish the game update check in time. Try again in a few minutes. No game files were changed.",
           "The game update check could not be completed. Try again in a few minutes. No game files were changed.",
@@ -14250,7 +14268,7 @@
     "Connecting To Steam": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 763,
+        "line": 766,
         "nearby": [
           "Validating Server Files",
           "Downloading Server Files",
@@ -14306,7 +14324,7 @@
     "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 879,
+        "line": 882,
         "nearby": [
           "Waiting for the update helper to start.",
           "Console Update Complete",
@@ -14395,7 +14413,7 @@
     "Console Update Already Running": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 907,
+        "line": 910,
         "nearby": [
           "Building Web Console",
           "Restarting Web Console",
@@ -14407,7 +14425,7 @@
     "Console Update Cancelled": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 862,
+        "line": 865,
         "nearby": [
           "Update Log",
           "Console Update Failed",
@@ -14419,7 +14437,7 @@
     "Console Update Complete": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 866,
+        "line": 869,
         "nearby": [
           "Console Update Cancelled",
           "The Console update was cancelled. Review the update log before retrying.",
@@ -14429,7 +14447,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 879,
+        "line": 882,
         "nearby": [
           "The update helper finished successfully. Waiting for the updated web console to answer.",
           "Waiting for the update helper to start.",
@@ -14452,7 +14470,7 @@
     "Console Update Failed": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 859,
+        "line": 862,
         "nearby": [
           "Dismiss",
           "Update Log",
@@ -17724,9 +17742,9 @@
     "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 703,
+        "line": 706,
         "nearby": [
-          "The game update was cancelled. Review the update log before retrying.",
+          "Preparing the new game files and verifying the Tank patch before shutdown.",
           "Fixing SteamCMD",
           "Updating"
         ]
@@ -17759,7 +17777,7 @@
     "Detecting updated image versions.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 798,
+        "line": 801,
         "nearby": [
           "Refreshing generated map catalogs.",
           "Running database migrations for the updated build.",
@@ -17911,18 +17929,6 @@
         ]
       }
     ],
-    "Disable before, restore after the update": [
-      {
-        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 590,
-        "nearby": [
-          "After the game files are updated, check RedBlink for a newer Dune Docker release and install it. Without this, the Console is never updated automatically.",
-          "Regis Tanks",
-          "Enabled",
-          "Disabled"
-        ]
-      }
-    ],
     "Disable Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
@@ -17978,23 +17984,12 @@
         ]
       }
     ],
-    "Disable Regis Tanks before the update and restore them afterwards": [
-      {
-        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 590,
-        "nearby": [
-          "Enabled",
-          "Disabled",
-          "If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.",
-          "Regis Tanks restore:"
-        ]
-      }
-    ],
     "Disable Regis Tanks in Settings → Experimental Features, then apply the game update again.": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 12,
+        "line": 15,
         "nearby": [
+          "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.",
           "Steam did not finish the game update check in time. Try again in a few minutes. No game files were changed.",
           "The game update check could not be completed. Try again in a few minutes. No game files were changed."
         ]
@@ -18089,7 +18084,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 570,
+        "line": 569,
         "nearby": [
           "Apply update when found",
           "Enabled",
@@ -18099,7 +18094,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 574,
+        "line": 573,
         "nearby": [
           "Warn players before restart",
           "Enabled",
@@ -18109,7 +18104,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 580,
+        "line": 579,
         "nearby": [
           "Wait until server is empty",
           "Enabled",
@@ -18119,7 +18114,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 585,
+        "line": 584,
         "nearby": [
           "Update the Console after a game update",
           "Enabled",
@@ -18426,7 +18421,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 671,
+        "line": 669,
         "nearby": [
           "Fix SteamCMD",
           "Retry Game Update",
@@ -18435,7 +18430,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 673,
+        "line": 671,
         "nearby": [
           "Retry Game Update",
           "Update Log",
@@ -18444,7 +18439,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 846,
+        "line": 849,
         "nearby": [
           "Refresh Console",
           "Retry Console Update",
@@ -18453,7 +18448,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 847,
+        "line": 850,
         "nearby": [
           "Retry Console Update",
           "Update Log",
@@ -18882,7 +18877,7 @@
     "Downloading Console Release": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 901,
+        "line": 904,
         "nearby": [
           "Launching Console Update",
           "Preparing Console Update",
@@ -18892,7 +18887,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 994,
+        "line": 997,
         "nearby": [
           "Backing Up Console Files",
           "Backing up the current console files before replacing them.",
@@ -18940,7 +18935,7 @@
     "Downloading Server Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 754,
+        "line": 757,
         "nearby": [
           "Updating",
           "Verifying Server Files",
@@ -18949,7 +18944,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 762,
+        "line": 765,
         "nearby": [
           "Server Files Installed",
           "Validating Server Files",
@@ -18961,7 +18956,7 @@
     "Downloading the selected console release.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 951,
+        "line": 954,
         "nearby": [
           "Console Update Already Running",
           "Updating Console",
@@ -18971,7 +18966,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 994,
+        "line": 997,
         "nearby": [
           "Backing up the current console files before replacing them.",
           "Downloading Console Release",
@@ -18983,7 +18978,7 @@
     "Downloading updated game server files.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 800,
+        "line": 803,
         "nearby": [
           "Detecting updated image versions.",
           "Loading updated game container images.",
@@ -19139,7 +19134,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 584,
+        "line": 583,
         "nearby": [
           "Maximum wait",
           "min",
@@ -19796,7 +19791,7 @@
     "Empty Server Policy": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 579,
+        "line": 578,
         "nearby": [
           "Warning Times (Min)",
           "Enter unique times from largest to smallest, separated by commas. Example: 15, 10, 5, 1.",
@@ -20036,7 +20031,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 570,
+        "line": 569,
         "nearby": [
           "Update Action",
           "Apply update when found",
@@ -20046,7 +20041,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 574,
+        "line": 573,
         "nearby": [
           "Player Notice",
           "Warn players before restart",
@@ -20056,7 +20051,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 580,
+        "line": 579,
         "nearby": [
           "Empty Server Policy",
           "Wait until server is empty",
@@ -20066,7 +20061,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 585,
+        "line": 584,
         "nearby": [
           "Dune Docker Console",
           "Update the Console after a game update",
@@ -20075,22 +20070,22 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 590,
-        "nearby": [
-          "Regis Tanks",
-          "Disable before, restore after the update",
-          "Disabled",
-          "Disable Regis Tanks before the update and restore them afterwards"
-        ]
-      },
-      {
-        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 631,
+        "line": 629,
         "nearby": [
           "Regis Tanks restore:",
           "Save Auto Updates",
           "Disabled",
-          "Game Update Blocked"
+          "Game Update Paused"
+        ]
+      },
+      {
+        "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
+        "line": 463,
+        "nearby": [
+          "Contribution",
+          "Save",
+          "Disabled",
+          "False"
         ]
       }
     ],
@@ -20324,7 +20319,7 @@
     "Enter unique times from largest to smallest, separated by commas. Example: 15, 10, 5, 1.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 576,
+        "line": 575,
         "nearby": [
           "Disabled",
           "Warning Times (Min)",
@@ -22081,7 +22076,7 @@
     "Finishing Console Update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 978,
+        "line": 981,
         "nearby": [
           "Finishing the console update and recording the backup location.",
           "Preparing the console update.",
@@ -22093,7 +22088,7 @@
     "Finishing the console update and recording the backup location.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 957,
+        "line": 960,
         "nearby": [
           "Rebuilding and restarting the web console container.",
           "The web console container was rebuilt successfully.",
@@ -22339,10 +22334,10 @@
     "Fix SteamCMD": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 669,
+        "line": 667,
         "nearby": [
           "Disabled",
-          "Game Update Blocked",
+          "Game Update Paused",
           "Retry Game Update",
           "Dismiss"
         ]
@@ -22375,10 +22370,10 @@
     "Fixing SteamCMD": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 703,
+        "line": 706,
         "nearby": [
-          "Update Cancelled",
-          "The game update was cancelled. Review the update log before retrying.",
+          "Checking Tank Compatibility",
+          "Preparing the new game files and verifying the Tank patch before shutdown.",
           "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update.",
           "Updating"
         ]
@@ -22979,7 +22974,7 @@
     "Game files and images are installed. The database was not touched.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 688,
+        "line": 686,
         "nearby": [
           "Update Log",
           "Game Files Installed",
@@ -22991,7 +22986,7 @@
     "Game Files Installed": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 688,
+        "line": 686,
         "nearby": [
           "Dismiss",
           "Update Log",
@@ -23092,15 +23087,27 @@
         ]
       }
     ],
-    "Game Update Blocked": [
+    "Game Update Paused": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 646,
+        "line": 644,
         "nearby": [
           "Enabled",
           "Disabled",
           "Fix SteamCMD",
           "Retry Game Update"
+        ]
+      }
+    ],
+    "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.": [
+      {
+        "file": "console/web/src/features/settings/ExperimentalFeatures.tsx",
+        "line": 63,
+        "nearby": [
+          "Regis Tanks",
+          "About Regis Tanks",
+          "Restart Queued",
+          "Loading…"
         ]
       }
     ],
@@ -24919,18 +24926,6 @@
         ]
       }
     ],
-    "If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.": [
-      {
-        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 591,
-        "nearby": [
-          "Disabled",
-          "Disable Regis Tanks before the update and restore them afterwards",
-          "Regis Tanks restore:",
-          "Save Auto Updates"
-        ]
-      }
-    ],
     "If this base's map is live, changes are queued and applied at its next restart.": [
       {
         "file": "console/web/src/features/bases/BaseChildPermissionsTab.tsx",
@@ -25725,7 +25720,7 @@
     "Installing Console Release": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 903,
+        "line": 906,
         "nearby": [
           "Downloading Console Release",
           "Backing Up Console Files",
@@ -25735,7 +25730,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 986,
+        "line": 989,
         "nearby": [
           "Verifying Console Version",
           "Verifying the installed console version.",
@@ -25771,7 +25766,7 @@
     "Installing Server Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 756,
+        "line": 759,
         "nearby": [
           "Downloading Server Files",
           "Verifying Server Files",
@@ -25783,7 +25778,7 @@
     "Installing the downloaded console release files.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 953,
+        "line": 956,
         "nearby": [
           "Downloading the selected console release.",
           "Backing up the current console files before replacing them.",
@@ -25793,7 +25788,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 986,
+        "line": 989,
         "nearby": [
           "Verifying the installed console version.",
           "Installing Console Release",
@@ -27343,7 +27338,7 @@
     "Latest": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 105,
+        "line": 108,
         "nearby": [
           "Update Available",
           "Open Updates"
@@ -27377,7 +27372,7 @@
     "Launching Console Update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 899,
+        "line": 902,
         "nearby": [
           "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.",
           "Updating Console",
@@ -28772,7 +28767,7 @@
     "Loading Steam Metadata": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 764,
+        "line": 767,
         "nearby": [
           "Downloading Server Files",
           "Connecting To Steam",
@@ -28829,7 +28824,7 @@
     "Loading updated game container images.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 799,
+        "line": 802,
         "nearby": [
           "Running database migrations for the updated build.",
           "Detecting updated image versions.",
@@ -29048,7 +29043,7 @@
         "file": "console/web/src/features/settings/ExperimentalFeatures.tsx",
         "line": 64,
         "nearby": [
-          "Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted.",
+          "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
           "Restart Queued",
           "Enabled",
           "Disabled"
@@ -29166,7 +29161,7 @@
     "Local tracked changes were detected; the updater will back up the current console files first.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 997,
+        "line": 1000,
         "nearby": [
           "Downloading the selected console release.",
           "Preparing Console Backup",
@@ -29209,7 +29204,7 @@
     "Logging In To Steam": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 765,
+        "line": 768,
         "nearby": [
           "Connecting To Steam",
           "Loading Steam Metadata",
@@ -30078,7 +30073,7 @@
     "Maximum wait": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 581,
+        "line": 580,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -30530,7 +30525,7 @@
     "min": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 566,
+        "line": 565,
         "nearby": [
           "Schedule",
           "Check for updates every",
@@ -30540,7 +30535,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 581,
+        "line": 580,
         "nearby": [
           "Disabled",
           "Maximum wait",
@@ -34287,7 +34282,7 @@
     "Open Updates": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 106,
+        "line": 109,
         "nearby": [
           "Update Available",
           "Latest"
@@ -36358,7 +36353,7 @@
     "Player Notice": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 573,
+        "line": 572,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -36826,7 +36821,7 @@
     "Preparing Console Backup": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 997,
+        "line": 1000,
         "nearby": [
           "Downloading Console Release",
           "Downloading the selected console release.",
@@ -36838,7 +36833,7 @@
     "Preparing Console Update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 900,
+        "line": 903,
         "nearby": [
           "Updating Console",
           "Launching Console Update",
@@ -36907,7 +36902,7 @@
     "Preparing Steam update metadata.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 810,
+        "line": 813,
         "nearby": [
           "Preparing the game update.",
           "Working on the game update.",
@@ -36918,7 +36913,7 @@
     "Preparing the console update.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 958,
+        "line": 961,
         "nearby": [
           "The web console container was rebuilt successfully.",
           "Finishing the console update and recording the backup location.",
@@ -36928,7 +36923,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 1008,
+        "line": 1011,
         "nearby": [
           "Preparing Console Backup",
           "Local tracked changes were detected; the updater will back up the current console files first.",
@@ -36937,7 +36932,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 1009,
+        "line": 1012,
         "nearby": [
           "Local tracked changes were detected; the updater will back up the current console files first.",
           "Working on the console update."
@@ -36959,7 +36954,7 @@
     "Preparing the game update.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 804,
+        "line": 807,
         "nearby": [
           "Checking available disk space before downloading files.",
           "Checking Steam for the latest available server build."
@@ -36967,7 +36962,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 808,
+        "line": 811,
         "nearby": [
           "Checking Steam for the latest available server build.",
           "Preparing Steam update metadata."
@@ -36975,10 +36970,22 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 809,
+        "line": 812,
         "nearby": [
           "Preparing Steam update metadata.",
           "Working on the game update."
+        ]
+      }
+    ],
+    "Preparing the new game files and verifying the Tank patch before shutdown.": [
+      {
+        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
+        "line": 699,
+        "nearby": [
+          "The game update was cancelled. Review the update log before retrying.",
+          "Checking Tank Compatibility",
+          "Fixing SteamCMD",
+          "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update."
         ]
       }
     ],
@@ -38567,7 +38574,7 @@
     "Rebuilding and restarting the web console container.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 955,
+        "line": 958,
         "nearby": [
           "Installing the downloaded console release files.",
           "Verifying the installed console version.",
@@ -38749,7 +38756,7 @@
     "Recording the previous console backup location.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 978,
+        "line": 981,
         "nearby": [
           "Preparing the console update.",
           "Finishing Console Update",
@@ -39406,7 +39413,7 @@
     "Refresh Console": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 845,
+        "line": 848,
         "nearby": [
           "Refresh Now",
           "The update helper finished. Refresh manually if this page does not detect it shortly.",
@@ -39477,7 +39484,7 @@
     "Refresh Now": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 843,
+        "line": 846,
         "nearby": [
           "Preparing Steam update metadata.",
           "Working on the game update.",
@@ -39486,7 +39493,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 844,
+        "line": 847,
         "nearby": [
           "Working on the game update.",
           "The update helper finished. Refresh manually if this page does not detect it shortly.",
@@ -39573,7 +39580,7 @@
     "Refreshing generated map catalogs.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 796,
+        "line": 799,
         "nearby": [
           "Starting SteamCMD",
           "Restarting the Dune server with the updated build.",
@@ -39673,12 +39680,12 @@
     "Regis Tanks": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 589,
+        "line": 588,
         "nearby": [
           "Update the Console after a game update",
           "After the game files are updated, check RedBlink for a newer Dune Docker release and install it. Without this, the Console is never updated automatically.",
-          "Disable before, restore after the update",
-          "Enabled"
+          "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.",
+          "Regis Tanks restore:"
         ]
       },
       {
@@ -39688,7 +39695,7 @@
           "Experimental Features",
           "Regis Tanks in the desert",
           "About Regis Tanks",
-          "Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted."
+          "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles."
         ]
       },
       {
@@ -39699,6 +39706,16 @@
           "Experimental",
           "Six Tier 6 Presets · Hagga Basin",
           "Enable Regis Tanks"
+        ]
+      }
+    ],
+    "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.": [
+      {
+        "file": "console/web/src/features/updates/updateUtils.ts",
+        "line": 12,
+        "nearby": [
+          "Disable Regis Tanks in Settings → Experimental Features, then apply the game update again.",
+          "Steam did not finish the game update check in time. Try again in a few minutes. No game files were changed."
         ]
       }
     ],
@@ -39727,10 +39744,10 @@
     "Regis Tanks restore:": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 592,
+        "line": 590,
         "nearby": [
-          "Disable Regis Tanks before the update and restore them afterwards",
-          "If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.",
+          "Regis Tanks",
+          "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.",
           "Save Auto Updates",
           "Enabled"
         ]
@@ -41422,7 +41439,7 @@
         "line": 64,
         "nearby": [
           "About Regis Tanks",
-          "Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted.",
+          "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
           "Loading…",
           "Enabled"
         ]
@@ -41723,7 +41740,7 @@
     "Restarting the Dune server with the updated build.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 795,
+        "line": 798,
         "nearby": [
           "Logging In To Steam",
           "Starting SteamCMD",
@@ -41735,7 +41752,7 @@
     "Restarting Web Console": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 906,
+        "line": 909,
         "nearby": [
           "Verifying Console Release",
           "Building Web Console",
@@ -42528,7 +42545,7 @@
     "Retry Console Update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 846,
+        "line": 849,
         "nearby": [
           "The update helper finished. Refresh manually if this page does not detect it shortly.",
           "Refresh Console",
@@ -42539,9 +42556,9 @@
     "Retry Game Update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 670,
+        "line": 668,
         "nearby": [
-          "Game Update Blocked",
+          "Game Update Paused",
           "Fix SteamCMD",
           "Dismiss"
         ]
@@ -43281,7 +43298,7 @@
     "Running database migrations for the updated build.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 797,
+        "line": 800,
         "nearby": [
           "Restarting the Dune server with the updated build.",
           "Refreshing generated map catalogs.",
@@ -43755,9 +43772,9 @@
     "Save Auto Updates": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 597,
+        "line": 595,
         "nearby": [
-          "If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.",
+          "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.",
           "Regis Tanks restore:",
           "Enabled",
           "Disabled"
@@ -44743,7 +44760,7 @@
     "Schedule": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 565,
+        "line": 564,
         "nearby": [
           "ON",
           "OFF",
@@ -46229,7 +46246,7 @@
     "Server Files Installed": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 760,
+        "line": 763,
         "nearby": [
           "Installing Server Files",
           "Updating Server Files",
@@ -48587,7 +48604,7 @@
     "Starting SteamCMD": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 766,
+        "line": 769,
         "nearby": [
           "Loading Steam Metadata",
           "Logging In To Steam",
@@ -48795,8 +48812,9 @@
     "Steam did not finish the game update check in time. Try again in a few minutes. No game files were changed.": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 36,
+        "line": 39,
         "nearby": [
+          "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.",
           "Disable Regis Tanks in Settings → Experimental Features, then apply the game update again.",
           "The game update check could not be completed. Try again in a few minutes. No game files were changed.",
           "Checking..."
@@ -48982,7 +49000,7 @@
     "Stopping game servers before replacing server files.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 801,
+        "line": 804,
         "nearby": [
           "Loading updated game container images.",
           "Downloading updated game server files.",
@@ -50624,7 +50642,7 @@
     "The Console update was cancelled. Review the update log before retrying.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 862,
+        "line": 865,
         "nearby": [
           "Console Update Failed",
           "Console Update Cancelled",
@@ -50811,7 +50829,7 @@
     "The game server update is complete. The server is coming back up now.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 690,
+        "line": 688,
         "nearby": [
           "Game files and images are installed. The database was not touched.",
           "Update Complete",
@@ -50835,7 +50853,7 @@
     "The game update check could not be completed. Try again in a few minutes. No game files were changed.": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 38,
+        "line": 41,
         "nearby": [
           "Disable Regis Tanks in Settings → Experimental Features, then apply the game update again.",
           "Steam did not finish the game update check in time. Try again in a few minutes. No game files were changed.",
@@ -50847,12 +50865,12 @@
     "The game update was cancelled. Review the update log before retrying.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 696,
+        "line": 694,
         "nearby": [
           "Update Failed",
           "Update Cancelled",
-          "Fixing SteamCMD",
-          "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update."
+          "Checking Tank Compatibility",
+          "Preparing the new game files and verifying the Tank patch before shutdown."
         ]
       }
     ],
@@ -51366,7 +51384,7 @@
     "The update helper finished successfully. Waiting for the updated web console to answer.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 873,
+        "line": 876,
         "nearby": [
           "Console Update Complete",
           "Waiting for Updated Console",
@@ -51377,7 +51395,7 @@
     "The update helper finished. Refresh manually if this page does not detect it shortly.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 844,
+        "line": 847,
         "nearby": [
           "Refresh Now",
           "Refresh Console",
@@ -51400,7 +51418,7 @@
     "The web console container was rebuilt successfully.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 956,
+        "line": 959,
         "nearby": [
           "Verifying the installed console version.",
           "Rebuilding and restarting the web console container.",
@@ -53615,18 +53633,6 @@
         ]
       }
     ],
-    "Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted.": [
-      {
-        "file": "console/web/src/features/settings/ExperimentalFeatures.tsx",
-        "line": 63,
-        "nearby": [
-          "Regis Tanks",
-          "About Regis Tanks",
-          "Restart Queued",
-          "Loading…"
-        ]
-      }
-    ],
     "Unowned": [
       {
         "file": "console/web/src/features/vehicles/VehiclesPanel.tsx",
@@ -53932,7 +53938,7 @@
     "Update Action": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 569,
+        "line": 568,
         "nearby": [
           "Check for updates every",
           "min",
@@ -53956,7 +53962,7 @@
     "Update Available": [
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 103,
+        "line": 106,
         "nearby": [
           "Checking",
           "Version",
@@ -53965,7 +53971,7 @@
       },
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 104,
+        "line": 107,
         "nearby": [
           "Version",
           "Latest",
@@ -53988,19 +53994,19 @@
     "Update Cancelled": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 696,
+        "line": 694,
         "nearby": [
           "The game server update is complete. The server is coming back up now.",
           "Update Failed",
           "The game update was cancelled. Review the update log before retrying.",
-          "Fixing SteamCMD"
+          "Checking Tank Compatibility"
         ]
       }
     ],
     "Update Complete": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 690,
+        "line": 688,
         "nearby": [
           "Game Files Installed",
           "Game files and images are installed. The database was not touched.",
@@ -54022,7 +54028,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 693,
+        "line": 691,
         "nearby": [
           "Update Complete",
           "The game server update is complete. The server is coming back up now.",
@@ -54058,7 +54064,7 @@
     "Update Log": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 675,
+        "line": 673,
         "nearby": [
           "Dismiss",
           "Game Files Installed",
@@ -54067,7 +54073,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 849,
+        "line": 852,
         "nearby": [
           "Dismiss",
           "Console Update Failed",
@@ -54090,7 +54096,7 @@
     "Update the Console after a game update": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 585,
+        "line": 584,
         "nearby": [
           "min",
           "Dune Docker Console",
@@ -54210,7 +54216,7 @@
     "Updating": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 706,
+        "line": 709,
         "nearby": [
           "Fixing SteamCMD",
           "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update."
@@ -54218,21 +54224,21 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 712,
+        "line": 715,
         "nearby": [
           "Detected a common Steam download error. Applying the automatic SteamCMD fix, then retrying the update."
         ]
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 720,
+        "line": 723,
         "nearby": [
           "Downloading Server Files"
         ]
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 722,
+        "line": 725,
         "nearby": [
           "Downloading Server Files",
           "Verifying Server Files"
@@ -54242,7 +54248,7 @@
     "Updating Console": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 883,
+        "line": 886,
         "nearby": [
           "Console Update Complete",
           "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.",
@@ -54252,7 +54258,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 909,
+        "line": 912,
         "nearby": [
           "Restarting Web Console",
           "Console Update Already Running",
@@ -54264,7 +54270,7 @@
     "Updating Server Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 757,
+        "line": 760,
         "nearby": [
           "Verifying Server Files",
           "Installing Server Files",
@@ -54286,7 +54292,7 @@
       },
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 75,
+        "line": 78,
         "nearby": [
           "The game update check could not be completed. Try again in a few minutes. No game files were changed.",
           "Checking...",
@@ -54656,7 +54662,7 @@
     "Validating Server Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 761,
+        "line": 764,
         "nearby": [
           "Updating Server Files",
           "Server Files Installed",
@@ -55013,7 +55019,7 @@
     "Verifying Console Release": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 904,
+        "line": 907,
         "nearby": [
           "Backing Up Console Files",
           "Installing Console Release",
@@ -55025,7 +55031,7 @@
     "Verifying Console Version": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 982,
+        "line": 985,
         "nearby": [
           "Finishing Console Update",
           "Recording the previous console backup location.",
@@ -55049,7 +55055,7 @@
     "Verifying Server Files": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 755,
+        "line": 758,
         "nearby": [
           "Updating",
           "Downloading Server Files",
@@ -55073,7 +55079,7 @@
     "Verifying the installed console version.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 954,
+        "line": 957,
         "nearby": [
           "Backing up the current console files before replacing them.",
           "Installing the downloaded console release files.",
@@ -55083,7 +55089,7 @@
       },
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 982,
+        "line": 985,
         "nearby": [
           "Recording the previous console backup location.",
           "Verifying Console Version",
@@ -55117,7 +55123,7 @@
       },
       {
         "file": "console/web/src/features/updates/updateUtils.ts",
-        "line": 85,
+        "line": 88,
         "nearby": [
           "Unknown",
           "Checking",
@@ -55344,7 +55350,7 @@
     "Wait until server is empty": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 580,
+        "line": 579,
         "nearby": [
           "Enter unique times from largest to smallest, separated by commas. Example: 15, 10, 5, 1.",
           "Empty Server Policy",
@@ -55465,7 +55471,7 @@
     "Waiting for the update helper to start.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 874,
+        "line": 877,
         "nearby": [
           "Waiting for Updated Console",
           "The update helper finished successfully. Waiting for the updated web console to answer.",
@@ -55477,7 +55483,7 @@
     "Waiting for Updated Console": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 870,
+        "line": 873,
         "nearby": [
           "The Console update was cancelled. Review the update log before retrying.",
           "Console Update Complete",
@@ -55520,7 +55526,7 @@
     "Warn players before restart": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 574,
+        "line": 573,
         "nearby": [
           "Disabled",
           "Player Notice",
@@ -55531,7 +55537,7 @@
     "Warning Times (Min)": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 575,
+        "line": 574,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -55866,6 +55872,18 @@
         ]
       }
     ],
+    "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.": [
+      {
+        "file": "console/web/src/features/updates/UpdatesPanel.tsx",
+        "line": 589,
+        "nearby": [
+          "After the game files are updated, check RedBlink for a newer Dune Docker release and install it. Without this, the Console is never updated automatically.",
+          "Regis Tanks",
+          "Regis Tanks restore:",
+          "Save Auto Updates"
+        ]
+      }
+    ],
     "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.": [
       {
         "file": "console/web/src/App.tsx",
@@ -55996,7 +56014,7 @@
     "Working on the console update.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 1011,
+        "line": 1014,
         "nearby": [
           "Preparing the console update."
         ]
@@ -56005,7 +56023,7 @@
     "Working on the game update.": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
-        "line": 811,
+        "line": 814,
         "nearby": [
           "Preparing the game update.",
           "Preparing Steam update metadata.",

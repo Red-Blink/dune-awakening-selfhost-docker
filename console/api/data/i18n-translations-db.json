@@ -57,6 +57,12 @@
     "ZH-HANT"
   ],
   "sourceStrings": [
+    "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
+    "Checking Tank Compatibility",
+    "Game Update Paused",
+    "Preparing the new game files and verifying the Tank patch before shutdown.",
+    "When Regis Tanks are enabled, compatible updates keep them enabled. Other updates pause before the Battlegroup stops.",
+    "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.",
     "Best Time by Difficulty",
     "Dungeons",
     "Fastest Clear",
