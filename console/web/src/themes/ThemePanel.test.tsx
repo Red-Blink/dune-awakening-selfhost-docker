@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ThemePanel } from "./ThemePanel";
@@ -87,6 +88,18 @@ describe("ThemePanel", () => {
     const back = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
     radios[1].dispatchEvent(back);
     expect(back.defaultPrevented).toBe(true);
+  });
+
+  it("handles Escape on the first frame the picker is mounted", () => {
+    const onClose = vi.fn();
+    function PickerHost() {
+      useLayoutEffect(() => {
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      }, []);
+      return <ThemePanel onClose={onClose} />;
+    }
+    render(<PickerHost />);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("Escape closes only the picker, even if another document listener exists", () => {
