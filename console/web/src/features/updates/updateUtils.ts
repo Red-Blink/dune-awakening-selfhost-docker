@@ -8,6 +8,9 @@ export const UPDATE_RESULT_DISMISS_MS = 10000;
 export function gameUpdateBlockReason(task: Task) {
   if (task.status !== "failed" || !["updateApply", "updateInstallAssets"].includes(task.operation)) return null;
   const text = stripAnsi([task.errorMessage || "", ...task.logLines.map(line => line.line)].join("\n"));
+  if (text.includes("DUNE_GAME_UPDATE_PAUSED=TANK_COMPATIBILITY")) {
+    return "Regis Tanks could not be verified for this build. Wait for Tank support or disable Regis Tanks in Settings → Experimental Features and retry. Starting Hagga with Tanks disabled can remove existing Tank vehicles.";
+  }
   if (!/Disable Experimental Tanks in Settings before updating game-server files\./i.test(text)) return null;
   return "Disable Regis Tanks in Settings → Experimental Features, then apply the game update again.";
 }

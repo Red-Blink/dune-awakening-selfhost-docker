@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Palette, X } from "lucide-react";
 import { PALETTE_GROUPS } from "./consolePalettes";
@@ -18,7 +18,7 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   const radios = useRef<(HTMLButtonElement | null)[]>([]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";

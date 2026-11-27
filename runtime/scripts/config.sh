@@ -307,11 +307,13 @@ EOF
       detected_ip="$(detect_server_ip_for_mode "$new_mode")"
     fi
 
-    cat <<EOF
-Changing server settings updates the service(s) that publish the server
-details to the in-game server browser if they are already running.
-
-EOF
+    if [ "$restart_services" = "1" ]; then
+      if [ -n "$new_mode" ]; then
+        echo "Changing network mode restarts Director, Gateway, Survival_1, and Overmap if running. Players on affected maps will disconnect. The change can take several minutes."
+      else
+        echo "Changing the title restarts Director and Gateway if running. Restarting Director also restarts a running Survival_1 and disconnects its players."
+      fi
+    fi
     [ -n "$new_title" ] && echo "New title: $new_title"
     if [ -n "$new_mode" ]; then
       echo "New mode:  $new_mode"
@@ -331,6 +333,9 @@ To apply them later, run:
   dune restart director
   dune restart gateway
 EOF
+      if [ -n "$new_mode" ]; then
+        echo "Apply the network change to running game maps with dune restart survival and dune restart overmap."
+      fi
     fi
 
     echo

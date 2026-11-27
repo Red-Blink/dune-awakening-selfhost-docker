@@ -44,6 +44,14 @@ value_is_known() {
   [ -n "$value" ] && [ "$value" != "unknown" ]
 }
 
+# A missing boot ID (including a legacy marker) is treated as an active stop.
+dune_manual_stop_applies_to_boot() {
+  local marker_boot_id current_boot_id
+  marker_boot_id="$(awk -F= '$1 == "DUNE_MANUAL_STOP_BOOT_ID" { print substr($0, length($1) + 2); exit }' "$1" 2>/dev/null || true)"
+  current_boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+  [[ -z "$marker_boot_id" || -z "$current_boot_id" || "$marker_boot_id" = "$current_boot_id" ]]
+}
+
 is_ipv4() {
   printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 }
