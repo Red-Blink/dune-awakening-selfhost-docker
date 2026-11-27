@@ -161,6 +161,20 @@ test("Hagga Basin has no archive pool (the archive is Deep-Desert-only) but does
   assert.equal(result.currentSeed, "cor-2");
 });
 
+test("Polar Sink never takes Deep Desert archive positions, even when a live field_id matches an archived one", async () => {
+  const config = configWithArchive(SAMPLE_ARCHIVE);
+  const fetchLiveRows = async () => ({ capabilities: { spiceActive: true }, rows: [{ field_id: "5007190163237080", map: "PolarCap_1", partition_id: 70, value_remaining: 2500000, size: "Large" }] });
+  const decodePosition = () => ({ x: 1800, y: -99960, z: 5383 });
+  const result = await liveMapSpice(null, config, "PolarCap_1", { resolveCycle: async () => ({ seed: "cor-2", nextCycleAt: null }), fetchLiveRows, fetchFlourSandRows: noFlourSandRows, decodePosition });
+  assert.equal(result.capabilities.spice, false);
+  assert.equal(result.rows.filter((r) => r.type === "spice").length, 0);
+  const activeRows = result.rows.filter((r) => r.type === "spice_active");
+  assert.equal(activeRows.length, 1);
+  assert.equal(activeRows[0].map, "PolarCap_1");
+  assert.equal(activeRows[0].x, 1800);
+  assert.equal(activeRows[0].y, -99960);
+});
+
 test("archive and a learned entry with the same field_id collide -- archive's position/confidence wins", async () => {
   const archiveConfig = configWithArchive({
     generated_at: "2026-08-22T00:00:00Z",

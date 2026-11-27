@@ -3636,6 +3636,29 @@ const LIVE_MAP_CONFIGS = {
     maxY: 1165416,
     flipY: false,
     defaultPartitionId: 8
+  },
+  // Game update 1.6.0. From the 1.6.0 test client: the image is the inner 8x8
+  // landscape HLOD colour bakes (T_LANDSCAPE_heightmap_x*_y*_LOD1_Packed_D,
+  // 512 px each, hill-shaded from the landscape heightmaps), which cover exactly DA_PolarCap_1_FullscreenMapData's
+  // Extents +/-203200 around (0,0); static markers land on the matching
+  // roads and cave mouths. DT_MapsInfo
+  // names the map "PolarCap_1", so actors are expected to carry that name; not
+  // yet confirmed against a 1.6.0 server. requiresPartition hides the tab until
+  // a PolarCap_1 partition exists.
+  PolarCap: {
+    key: "PolarCap",
+    label: "Polar Sink",
+    actorMap: "PolarCap_1",
+    image: "/images/maps/polar-sink.webp",
+    width: 4096,
+    height: 4096,
+    minX: -203200,
+    maxX: 203200,
+    minY: -203200,
+    maxY: 203200,
+    flipY: false,
+    defaultPartitionId: 0,
+    requiresPartition: true
   }
 };
 
@@ -3679,7 +3702,8 @@ export async function liveMapPartitions(db) {
       -- the same translation in the other direction) -- without this, a
       -- partition sourced from world_partition would never match either
       -- map tab.
-      coalesce(case lower(wp.map) when 'deepdesert_1' then 'DeepDesert' when 'survival_1' then 'HaggaBasin' else wp.map end, '') as map,
+      -- PolarCap_1 has no separate friendly name (DT_MapsInfo row = instance name).
+      coalesce(case lower(wp.map) when 'deepdesert_1' then 'DeepDesert' when 'survival_1' then 'HaggaBasin' when 'polarcap_1' then 'PolarCap_1' else wp.map end, '') as map,
       wp.partition_id,
       coalesce(nullif(wp.label, ''), nullif(wp.map, ''), 'Partition ' || wp.partition_id::text) as name,
       ${hasActors ? "count(a.id) filter (where a.transform is not null)::int" : "0"} as marker_count,
@@ -3692,9 +3716,9 @@ export async function liveMapPartitions(db) {
     -- CB_Ecolab_*, CB_Overland_*, Overmap, ...) carry a real, non-null
     -- server_id too -- they are genuinely running server processes, just
     -- not ones the Live Map exposes a tab for. nullif(server_id, '') alone
-    -- does not exclude them; only the two instance names the map-name
+    -- does not exclude them; only the instance names the map-name
     -- translation above actually understands are real Live Map partitions.
-    where wp.partition_id > 0 and lower(wp.map) in ('deepdesert_1', 'survival_1')
+    where wp.partition_id > 0 and lower(wp.map) in ('deepdesert_1', 'survival_1', 'polarcap_1')
     group by wp.partition_id, wp.map, wp.label
     order by map, wp.partition_id`);
   return { rows: result.rows.map((row) => ({ ...row, partition_id: Number(row.partition_id || 0), marker_count: Number(row.marker_count || 0), alive: row.alive == null ? null : Boolean(row.alive), ready: row.ready == null ? null : Boolean(row.ready) })) };
@@ -4368,7 +4392,9 @@ export async function liveMapFlourSandFieldRows(db, map = "") {
 // matching the suffix instead both fixes that false positive and is what
 // the live map's Ore/Pickup sub-grouping keys off of.
 const POI_CATEGORY_PATTERNS = {
-  ore: ["%Ore", "%Pickup", "%Rock"],
+  // Polar Sink (1.6.0) resource nodes have no suffix; matched by exact name
+  // (DT_PolarCap_FullscreenMapMarkers rows).
+  ore: ["%Ore", "%Pickup", "%Rock", "GlacialIce", "SalvagedPlastic", "IrradiatedParts"],
   scrap: ["%scrap%", "%fuelcell%"],
   flora: ["%bush%", "%primrose%", "%saguaro%"],
   hazard: ["%hazard%"],
@@ -4386,7 +4412,9 @@ const POI_CATEGORY_PATTERNS = {
   poi: [
     "%cave%", "%ecolab%", "%sietch%",
     "%dojo%", "%vendor%", "%choam%", "%bank%", "%tradingpost%",
-    "%taxi%", "%imperialconsulate%", "%shipwreck%"
+    "%taxi%", "%imperialconsulate%", "%shipwreck%",
+    // Exact, so Overmap_Poi_Dungeon stays out. PolarCave already matches %cave%.
+    "Dungeon"
   ]
 };
 

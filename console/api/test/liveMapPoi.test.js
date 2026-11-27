@@ -24,6 +24,10 @@ test("ore marker identifiers receive their player-facing resource names", () => 
   assert.equal(liveMapSubtypeLabel("ore", "MagnetiteOre"), "Iron");
   assert.equal(liveMapSubtypeLabel("ore", "RhyoliteOre"), "Granite");
   assert.equal(liveMapSubtypeLabel("ore", "FutureiumOre"), "Futureium");
+  // Polar Sink (1.6.0) resource nodes have no Ore/Pickup/Rock suffix.
+  assert.equal(liveMapSubtypeLabel("ore", "GlacialIce"), "Glacial Ice");
+  assert.equal(liveMapSubtypeLabel("ore", "SalvagedPlastic"), "Salvaged Plastic");
+  assert.equal(liveMapSubtypeLabel("ore", "IrradiatedParts"), "Irradiated Parts");
 });
 
 test("Deep Desert POI rows include their grid sector", async () => {

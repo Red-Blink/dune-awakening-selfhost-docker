@@ -600,6 +600,27 @@ function useDeepDesert(extra: Record<string, unknown> = {}) {
   } as never);
 }
 
+// Polar Sink (game update 1.6.0) is configured ahead of the server; its tab
+// must stay hidden until a PolarCap_1 partition exists.
+const polarSink = { ...map, key: "PolarCap", label: "Polar Sink", actorMap: "PolarCap_1", defaultPartitionId: 0, requiresPartition: true };
+
+it("hides a map that requires a partition until one exists, then shows its tab", async () => {
+  const base = await vi.mocked(liveMapApi.markers)() as unknown as Record<string, unknown>;
+  vi.mocked(liveMapApi.markers).mockResolvedValue({ ...base, maps: { HaggaBasin: map, PolarCap: polarSink } } as never);
+  const first = renderPanel();
+  await screen.findByRole("button", { name: "Hagga Basin" });
+  expect(screen.queryByRole("button", { name: "Polar Sink" })).not.toBeInTheDocument();
+  first.unmount();
+
+  vi.mocked(liveMapApi.markers).mockResolvedValue({
+    ...base,
+    maps: { HaggaBasin: map, PolarCap: polarSink },
+    partitions: [...(base.partitions as unknown[]), { map: "PolarCap_1", partition_id: 70, name: "Polar Sink", marker_count: 0 }]
+  } as never);
+  renderPanel();
+  expect(await screen.findByRole("button", { name: "Polar Sink" })).toBeInTheDocument();
+});
+
 it("labels an offline dynamic Deep Desert as saved data and keeps teleport unavailable", async () => {
   useDeepDesert({
     partitions: [{ map: "DeepDesert", partition_id: 8, name: "PvP", marker_count: 1, alive: false, ready: false }]
