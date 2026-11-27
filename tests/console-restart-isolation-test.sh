@@ -13,6 +13,10 @@ mkdir -p "$fixture/repo/runtime/scripts/lib" "$fixture/bin" "$fixture/state"
 for script in console.sh start-coriolis-coordinator.sh compose-project.sh host-paths.sh runtime-env.sh memory-swap-common.sh env-file.sh host-file-ownership.sh lib/secrets.sh lib/ports.sh; do
   cp "$repo_root/runtime/scripts/$script" "$fixture/repo/runtime/scripts/$script"
 done
+# The hosted-bot stack adds this launcher dependency; the base auth PR does not.
+if [ -f "$repo_root/runtime/scripts/lib/console-secrets-env.sh" ]; then
+  cp "$repo_root/runtime/scripts/lib/console-secrets-env.sh" "$fixture/repo/runtime/scripts/lib/console-secrets-env.sh"
+fi
 touch "$fixture/repo/docker-compose.web.yml"
 printf 'DUNE_COMPOSE_PROJECT_NAME=isolation-test\n' > "$fixture/repo/.env"
 export TEST_STATE="$fixture/state"

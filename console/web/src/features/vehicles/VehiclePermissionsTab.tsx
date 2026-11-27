@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -258,7 +259,7 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
           />
         </div>
 
-        <div className="vehicles-permissions-toolbar">
+        <PermissionGate action="vehicles:mutate"><div className="vehicles-permissions-toolbar">
           <div className="vehicles-permissions-add">
             <div className="action-row vehicles-permissions-search-row">
               <input
@@ -297,14 +298,14 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
           <div className="vehicles-permissions-actions">
             <span className="muted">{dirty ? "Unsaved changes" : ""}</span>
             <button disabled={!dirty || saving} onClick={() => setDraft(saved)}>Revert</button>
-            <button
+            <PermissionGate action="vehicles:mutate"><button
               className="update-action"
               disabled={!dirty || !owner || saving || Boolean(locked)}
               title={locked || `Save permissions for ${vehicleName}`}
               onClick={() => void save()}
-            >{saving ? "Saving…" : "Save changes"}</button>
+            >{saving ? "Saving…" : "Save changes"}</button></PermissionGate>
           </div>
-        </div>
+        </div></PermissionGate>
 
         {/* Do not reserve an empty message area. Warnings and results appear
             only when they have useful information, matching the compact action
@@ -348,19 +349,20 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
               />
               <RankSegments
                 entry={entry}
+                permissionAction="vehicles:mutate"
                 scopeId={vehicleId}
                 disabled={saving || Boolean(locked)}
                 onChange={(rank) => changeRank(entry.playerId, rank)}
                 groupClassName="vehicles-rank-segments"
                 segmentClassName="vehicles-rank-segment"
               />
-              <button
+              <PermissionGate action="vehicles:mutate"><button
                 className="icon-toggle-button vehicles-permissions-remove"
                 disabled={saving || Boolean(locked)}
                 title={locked || `Remove ${entry.name || entry.playerId}`}
                 aria-label={`Remove ${entry.name || entry.playerId}`}
                 onClick={() => removeEntry(entry.playerId)}
-              ><Trash2 size={15} /></button>
+              ><Trash2 size={15} /></button></PermissionGate>
             </div>
           ))}
           {!nonOwners.length && <p className="muted">This vehicle is not shared with anyone else.</p>}

@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { friendlyApiError } from "../../api/client";
 import { playersApi } from "../../api/players";
@@ -115,7 +116,7 @@ export function PlayerFactionAssignment({
               {FACTIONS.map((faction) => <option key={faction.id} value={faction.id}>{faction.name}</option>)}
             </select>
           </label>
-          <button className="danger" disabled={!supported || !playerId || !selected || unchanged || pending} onClick={() => void assignFaction()}>Change Faction</button>
+          <PermissionGate action="players:grant"><button className="danger" disabled={!supported || !playerId || !selected || unchanged || pending} onClick={() => void assignFaction()}>Change Faction</button></PermissionGate>
         </div>
         <InlineActionResult result={result} resultKey="assignFaction" />
       </div>

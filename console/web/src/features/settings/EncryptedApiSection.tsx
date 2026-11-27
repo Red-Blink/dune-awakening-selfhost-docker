@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { Copy } from "lucide-react";
 import { encryptedApiApi, type EncryptedApiStatus } from "../../api/encryptedApi";
@@ -112,8 +113,8 @@ export function EncryptedApiSection() {
       <div className="encrypted-api-controls">
         {status.available ? <label className={`switch-checkbox encrypted-api-switch ${enabled ? "enabled" : "disabled"} ${busy || label === "Starting" ? "is-pending" : needsAttention ? "needs-attention" : ""}`}
           title={busy && changingTo ? "The first start can take a minute." : undefined}>
-          <input type="checkbox" aria-label="Enable Encrypted API Access" disabled={busy} checked={enabled}
-            onChange={(event) => { void toggle(event.target.checked); }} />
+          <PermissionGate action="settings:write"><input type="checkbox" aria-label="Enable Encrypted API Access" disabled={busy} checked={enabled}
+            onChange={(event) => { void toggle(event.target.checked); }} /></PermissionGate>
           <span className="switch-label">HTTPS Access</span>
           <strong className="switch-state" role="status" aria-label="Encrypted API Status">{label}</strong>
         </label> : <StatusPill value={label} />}

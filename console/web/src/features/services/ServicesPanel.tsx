@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect } from "react";
 import { serverApi } from "../../api/server";
 import type { Task } from "../../api/setup";
@@ -43,8 +44,8 @@ export function ServicesPanel({ services, setServices, setTask, openLogs, onErro
         {rows.map((row) => <article className="service-card" key={row.name}>
           <div><strong>{friendlyServiceName(row.name)}</strong><span>{row.status}</span><span>{row.ports}</span></div>
           <div className="service-actions">
-            {serviceActionName(row.name, "restart") && <button onClick={() => restart(serviceActionName(row.name, "restart") || row.name)}>Restart</button>}
-            <button onClick={() => openLogs(serviceActionName(row.name, "logs") || row.name)}>Logs</button>
+            {serviceActionName(row.name, "restart") && <PermissionGate action="server:restart-service"><button onClick={() => restart(serviceActionName(row.name, "restart") || row.name)}>Restart</button></PermissionGate>}
+            <PermissionGate action="logs:read"><button onClick={() => openLogs(serviceActionName(row.name, "logs") || row.name)}>Logs</button></PermissionGate>
           </div>
         </article>)}
       </div>}

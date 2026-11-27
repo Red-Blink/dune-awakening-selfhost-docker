@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useState } from "react";
 import { playersApi } from "../../api/players";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
@@ -186,7 +187,7 @@ export function BuildingUnlocksTab({ dbPlayerId, playerName, confirmAction, onAc
           const row = item as unknown as BuildingUnlockRow;
           const disabled = !ownershipSupported || row.status !== "Available" || Boolean(busyItemId);
           const label = busyItemId === row.itemId ? "Granting..." : row.status === "Owned" ? row.entitlementControlled ? "Recorded" : "Owned" : row.status === "Pending" ? "Pending" : row.status === "Delivered" || row.status === "Processing" ? "Delivered" : row.status === "Unknown" ? "Unavailable" : "Grant";
-          return <button className="playerAdmin_stateActionButton" disabled={disabled} onClick={() => void grant(row)}>{label}</button>;
+          return <PermissionGate action="players:grant"><button className="playerAdmin_stateActionButton" disabled={disabled} onClick={() => void grant(row)}>{label}</button></PermissionGate>;
         }}
       />}
     </section>

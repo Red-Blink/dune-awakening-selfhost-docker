@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { marketBotItemsApi, type MarketBotItemRow, type MarketCatalogPickItem } from "../../api/marketBotItems";
@@ -558,7 +559,7 @@ export function BotItemsTab({ onError, onDirtyChange }: BotItemsTabProps) {
           </div>
           <div className="database-pagination-controls">
             <button onClick={discardAll} disabled={saving}>Discard Changes</button>
-            <button className="primary" onClick={() => void saveAll()} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+            <PermissionGate action="exchange:market-write"><button className="primary" onClick={() => void saveAll()} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button></PermissionGate>
           </div>
         </div>
       )}

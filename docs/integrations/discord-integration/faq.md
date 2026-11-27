@@ -59,7 +59,7 @@ clear the global commands.
 **Q: Why can't I use admin commands like `/dune admin doctor`?**
 
 Admin commands require the Admin role as configured by your server owner.
-Regular members with the Observer role can only use read-only commands.
+Regular members with the Player role can only use read-only commands.
 
 **Q: What does "diagnostic mode" mean?**
 
@@ -176,7 +176,7 @@ Use `DISCORD_GUILD_ID` for instant registration.
 **Q: I get "not authorized" on commands I should have access to.**
 
 Check that your Discord role ID matches the IDs in both the bot's `.env` and
-the console's `.env` under `DISCORD_OBSERVER_ROLE_IDS`,
+the console's `.env` under `DISCORD_PLAYER_ROLE_IDS`,
 `DISCORD_MODERATOR_ROLE_IDS`, `DISCORD_ADMIN_ROLE_IDS` or
 `DISCORD_OWNER_ROLE_IDS`. Several commands (population, maps, player link and
 inventory) need the Moderator tier.

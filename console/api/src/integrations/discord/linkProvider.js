@@ -75,7 +75,7 @@ export async function linkPlayerProvider(db, config, { discordUserId, characterN
       senderFuncomId: persona.funcomId,
       senderHexFlsId: persona.hexFlsId,
       senderDisplayName: "Dune Docker Console",
-      message: `Your Discord verification code is: ${code}. Use /dune data verify followed by this code to link your character.`
+      message: `Your Discord verification code is: ${code}. Use /dune player verify followed by this code to link your character.`
     });
   } catch (error) {
     await deletePendingLink(db, discordUserId, code);
@@ -87,7 +87,7 @@ export async function linkPlayerProvider(db, config, { discordUserId, characterN
     pending: true,
     characterName: player.character_name,
     expiresInSeconds: CODE_EXPIRY_MINUTES * 60,
-    message: "A private verification code was sent in game. Use /dune data verify followed by that code within five minutes."
+    message: "A private verification code was sent in game. Use /dune player verify followed by that code within five minutes."
   };
 }
 
@@ -99,7 +99,7 @@ export async function verifyPlayerLinkProvider(db, { discordUserId, code }) {
   const pending = await consumePendingLink(db, discordUserId, String(code).trim().toUpperCase());
 
   if (!pending) {
-    return { ok: false, error: "Invalid or expired verification code. Use /dune data link <character> to generate a new one." };
+    return { ok: false, error: "Invalid or expired verification code. Use /dune player link <character> to generate a new one." };
   }
 
   await discordPlayerLink(db, discordUserId, pending.player_controller_id);
@@ -111,7 +111,7 @@ export async function verifyPlayerLinkProvider(db, { discordUserId, code }) {
     characterName: linked.character_name,
     controllerId: pending.player_controller_id,
     pawnId: linked.player_pawn_id,
-    message: `Successfully linked as ${linked.character_name}. Use /dune data inventory to view your inventory.`
+    message: `Successfully linked as ${linked.character_name}. Use /dune player inventory to view your inventory.`
   };
 }
 
@@ -123,7 +123,7 @@ export async function unlinkProvider(db, { discordUserId }) {
 export async function whoamiProvider(db, { discordUserId }) {
   const linked = await getLinkedPlayer(db, discordUserId);
   if (!linked) {
-    return { ok: true, linked: false, message: "Not linked. Use /dune data link <character-name>" };
+    return { ok: true, linked: false, message: "Not linked. Use /dune player link <character-name>" };
   }
   return {
     ok: true,
@@ -138,7 +138,7 @@ export async function whoamiProvider(db, { discordUserId }) {
 export async function requireLinkedPlayer(db, discordUserId) {
   const linked = await getLinkedPlayer(db, discordUserId);
   if (!linked) {
-    throw policyError("not_linked", "Not linked to a game character. Use /dune data link <name> first.", 403);
+    throw policyError("not_linked", "Not linked to a game character. Use /dune player link <name> first.", 403);
   }
   return linked;
 }

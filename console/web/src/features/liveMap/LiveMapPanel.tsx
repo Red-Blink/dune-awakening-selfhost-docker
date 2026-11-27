@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, Settings } from "lucide-react";
 import { liveMapApi, type LiveMapConfig, type LiveMapMarker, type LiveMapPartition } from "../../api/liveMap";
@@ -198,6 +199,10 @@ function HomeTaskResultCard({ result }: { result: HomeTaskResult }) {
 }
 
 export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnicalDetails, onOpenBase, onOpenVehicle }: LiveMapPanelProps) {
+  const access = useConsoleAccess();
+  const layerActions: Record<string, string> = { player: "players:read", base: "bases:read", vehicle: "vehicles:read", storage: "storage:read", service: "server:read" };
+  const layerAllowed = (key: string) => !layerActions[key] || access.can(layerActions[key]);
+  const permittedLegend = LEGEND_LAYOUT.filter(item => "header" in item ? (SECTION_MEMBERS[item.header] || []).some(layerAllowed) : layerAllowed(item.key));
   const [mapKey, setMapKey] = useState("HaggaBasin");
   const [mapConfig, setMapConfig] = useState<LiveMapConfig | null>(null);
   const [maps, setMaps] = useState<Record<string, LiveMapConfig>>({});
@@ -208,7 +213,8 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   // not the shortened world_partition.label default. Supplementary metadata
   // only; a resolve failure must not block the Partition dropdown.
   const [partitionDisplayNames, setPartitionDisplayNames] = useState<Record<string, string>>({});
-  const [markers, setMarkers] = useState<LiveMapMarker[]>([]);
+  const [allMarkers, setMarkers] = useState<LiveMapMarker[]>([]);
+  const markers = useMemo(() => allMarkers.filter(marker => layerAllowed(String(marker.type))), [allMarkers, access]);
   const [overlays, setOverlays] = useState<Record<string, string>>({});
   const [capabilities, setCapabilities] = useState<Record<string, unknown>>({});
   const knownSubtypesRef = useRef<Record<string, string[]>>({});
@@ -218,8 +224,10 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   // "Pinned" marker (clicked -- stays open until a click lands outside every
   // marker) takes priority over "hoveredMarker" (transient preview, cleared
   // on mouseleave) -- see displayedMarker below.
-  const [selected, setSelected] = useState<LiveMapMarker | null>(null);
-  const [hoveredMarker, setHoveredMarker] = useState<LiveMapMarker | null>(null);
+  const [selectedMarker, setSelected] = useState<LiveMapMarker | null>(null);
+  const selected = selectedMarker && layerAllowed(String(selectedMarker.type)) ? selectedMarker : null;
+  const [hovered, setHoveredMarker] = useState<LiveMapMarker | null>(null);
+  const hoveredMarker = hovered && layerAllowed(String(hovered.type)) ? hovered : null;
   const [filters, setFilters] = useState<Record<string, boolean>>(() => ({ ...DEFAULT_LAYER_FILTERS, ...loadDefaultLayerFilters() }));
   const [markerSearch, setMarkerSearch] = useState("");
   const [layerSettingsOpen, setLayerSettingsOpen] = useState(false);
@@ -289,6 +297,13 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   // marker objects are replaced wholesale on every auto-refresh poll.
   const [teleportPickerFor, setTeleportPickerFor] = useState<LiveMapMarker | null>(null);
   const [teleportPickerPlayerId, setTeleportPickerPlayerId] = useState("");
+  useEffect(() => {
+    if (!access.can("maps:teleport")) {
+      setPlayerDrag(null);
+      setPlayerTeleportPreview(null);
+      setTeleportPickerFor(null);
+    }
+  }, [access]);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const sectorLabelsRef = useRef<SVGGElement | null>(null);
@@ -1112,11 +1127,11 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           <label htmlFor="live-map-marker-search">
             <span className="live-map-view-label">Search Map</span>
             <span className="live-map-search-control">
-              <input id="live-map-marker-search" type="search" value={markerSearch} onChange={(event) => setMarkerSearch(event.target.value)} placeholder="Player, owner, base, vehicle..." />
+              <input id="live-map-marker-search" type="search" value={markerSearch} onChange={(event) => setMarkerSearch(event.target.value)} placeholder="Search visible map markers" />
               {markerSearch && <button type="button" onClick={() => setMarkerSearch("")}>Clear</button>}
             </span>
           </label>
-          <span className="muted">Searches player names and marker names, plus base and vehicle owners.</span>
+          <span className="muted">Searches names and locations in the layers available to your account.</span>
         </section>
         <section className="action-section">
           <div className="live-map-layers-header" ref={layerSettingsRef}>
@@ -1129,7 +1144,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
               <p className="live-map-layers-popover-hint">Choose which layers -- and sub-types -- are on when the map first loads.</p>
               <div className="live-map-layers-popover-list">{(() => {
                 let currentSection = "";
-                return LEGEND_LAYOUT.map((item, index) => {
+                return permittedLegend.map((item, index) => {
                   if ("header" in item) {
                     currentSection = item.header;
                     return <p key={`settings-header-${index}`} className="live-map-layers-popover-section">{item.header}</p>;
@@ -1277,7 +1292,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                 <input type="checkbox" aria-label="Elevation Lines" checked={showElevationLines} onChange={() => setShowElevationLines((on) => !on)} />
               </label>}
             </div>}
-            {LEGEND_LAYOUT.map((item, index) => {
+            {permittedLegend.map((item, index) => {
             if ("header" in item) {
               const sectionName = item.header;
               currentSection = sectionName;
@@ -1527,14 +1542,14 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                     <span>Partition</span><strong>{partitionDisplayNames[partitionId] || partitionId || "none selected"}</strong>
                   </div>
                   <div className="live-map-marker-overlay-actions">
-                    <button type="button" className="live-map-marker-overlay-action" disabled={onlinePlayersForMarker(pickedMarker).length === 0} title={onlinePlayersForMarker(pickedMarker).length === 0 ? "Teleport is available only when an online player is already inside this running partition." : undefined} onClick={() => openTeleportPicker(pickedMarker)}>Teleport</button>
+                    <PermissionGate action="maps:teleport"><button type="button" className="live-map-marker-overlay-action" disabled={onlinePlayersForMarker(pickedMarker).length === 0} title={onlinePlayersForMarker(pickedMarker).length === 0 ? "Teleport is available only when an online player is already inside this running partition." : undefined} onClick={() => openTeleportPicker(pickedMarker)}>Teleport</button></PermissionGate>
                   </div>
-                  {teleportPickerFor && String(teleportPickerFor.id) === "picked" && <div className="live-map-marker-overlay-teleport">
+                  {access.can("maps:teleport") && teleportPickerFor && String(teleportPickerFor.id) === "picked" && <div className="live-map-marker-overlay-teleport">
                     <select aria-label="Teleport destination player" value={teleportPickerPlayerId} onChange={(event) => setTeleportPickerPlayerId(event.target.value)}>
                       {onlinePlayersForMarker(pickedMarker).map((row) => <option key={playerMarkerId(row)} value={playerMarkerId(row)}>{friendlyMarkerName(row)}</option>)}
                     </select>
                     <div className="live-map-marker-overlay-actions">
-                      <button type="button" className="live-map-marker-overlay-action" onClick={() => void confirmTeleportToMarker(pickedMarker, teleportPickerPlayerId)}>Confirm</button>
+                      <PermissionGate action="maps:teleport"><button type="button" className="live-map-marker-overlay-action" onClick={() => void confirmTeleportToMarker(pickedMarker, teleportPickerPlayerId)}>Confirm</button></PermissionGate>
                       <button type="button" className="live-map-marker-overlay-action" onClick={() => setTeleportPickerFor(null)}>Cancel</button>
                     </div>
                   </div>}
@@ -1576,7 +1591,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                   onMouseEnter={() => setHoveredMarker(marker)}
                   onMouseLeave={() => setHoveredMarker(null)}
                   onMouseDown={(event) => {
-                    if (!isPlayer) return;
+                    if (!isPlayer || !access.can("maps:teleport")) return;
                     event.stopPropagation();
                     event.preventDefault();
                     liveMapDraggingPlayerRef.current = true;
@@ -1601,7 +1616,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                       {liveMapOverlayFacts(marker, maps, partitions, partitionDisplayNames).map(([key, value]) => <React.Fragment key={key}><span>{key}</span><strong>{value}</strong></React.Fragment>)}
                     </div>
                     <div className="live-map-marker-overlay-actions">
-                      <button type="button" className="live-map-marker-overlay-action" disabled={!canTeleportToMarker} title={!canTeleportToMarker ? "Teleport is available only when an online player is already inside this running partition." : undefined} onClick={(event) => { event.stopPropagation(); openTeleportPicker(marker); }}>Teleport</button>
+                      <PermissionGate action="maps:teleport"><button type="button" className="live-map-marker-overlay-action" disabled={!canTeleportToMarker} title={!canTeleportToMarker ? "Teleport is available only when an online player is already inside this running partition." : undefined} onClick={(event) => { event.stopPropagation(); openTeleportPicker(marker); }}>Teleport</button></PermissionGate>
                       {String(marker.type).toLowerCase() === "base" && <button type="button" className="live-map-marker-overlay-action" onClick={(event) => { event.stopPropagation(); onOpenBase(String(marker.id)); }}>Open in Bases</button>}
                       {String(marker.type).toLowerCase() === "vehicle" && <button type="button" className="live-map-marker-overlay-action" onClick={(event) => { event.stopPropagation(); onOpenVehicle(String(marker.id)); }}>Open in Vehicles</button>}
                     </div>
@@ -1610,7 +1625,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                         {onlinePlayersForMarker(marker).map((row) => <option key={playerMarkerId(row)} value={playerMarkerId(row)}>{friendlyMarkerName(row)}</option>)}
                       </select>
                       <div className="live-map-marker-overlay-actions">
-                        <button type="button" className="live-map-marker-overlay-action" onClick={() => void confirmTeleportToMarker(marker, teleportPickerPlayerId)}>Confirm</button>
+                        <PermissionGate action="maps:teleport"><button type="button" className="live-map-marker-overlay-action" onClick={() => void confirmTeleportToMarker(marker, teleportPickerPlayerId)}>Confirm</button></PermissionGate>
                         <button type="button" className="live-map-marker-overlay-action" onClick={() => setTeleportPickerFor(null)}>Cancel</button>
                       </div>
                     </div>}
