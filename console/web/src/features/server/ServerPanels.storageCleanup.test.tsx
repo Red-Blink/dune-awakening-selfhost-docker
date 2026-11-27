@@ -9,9 +9,10 @@ vi.mock("../../api/server", () => ({ serverApi: {
   status: vi.fn().mockResolvedValue({ stdout: "" }), readiness: vi.fn().mockResolvedValue({ stdout: "READY: all checks passed" }),
   ports: vi.fn().mockResolvedValue({ stdout: "" }), doctor: mocks.doctor,
   restartSchedule: vi.fn().mockResolvedValue({ stdout: "" }), restartHistory: vi.fn().mockResolvedValue({ rows: [] }),
-  cleanupDockerImages: mocks.images, cleanupDockerBuildCache: mocks.cache
+  cleanupDockerImages: mocks.images, cleanupDockerBuildCache: mocks.cache, saveConfig: vi.fn()
 } }));
 vi.mock("../../api/setup", () => ({ setupApi: { task: mocks.task } }));
+import { serverApi } from "../../api/server";
 vi.mock("./ServerHostnameSetting", () => ({ useServerHostname: () => ({ ready: true, valid: true }), ServerHostnameSetting: () => null }));
 vi.mock("../../lib/usePendingRefills", async (importOriginal) => ({ ...await importOriginal<typeof import("../../lib/usePendingRefills")>(), usePendingQueues: () => ({ fuel: {}, water: {}, deletes: {}, vehicleDeletes: {}, permissions: {} }) }));
 
@@ -19,17 +20,43 @@ function Harness() {
   const [doctor, setDoctor] = useState("WARN Docker has 6 reclaimable images\nWARN Docker has 11.05GB of reclaimable build cache\nWARN Keep this unrelated diagnostic");
   const [visible, setVisible] = useState(true);
   const [result, setResult] = useState<HomeTaskResult | null>(null);
+  const [configResult, setConfigResult] = useState<HomeTaskResult | null>(null);
   const [operation, setOperation] = useState<StorageCleanupOperation>("");
   return <><button onClick={() => setVisible(!visible)}>Navigate</button>{visible && <ServerPanel
     status="" readiness="READY: all checks passed" ports="" doctor={doctor}
     setTask={vi.fn()} setStatus={mocks.setStatus} setReadiness={vi.fn()} setPorts={vi.fn()} setDoctor={setDoctor}
     storageCleanupResult={result} setStorageCleanupResult={setResult} storageCleanupOperation={operation} setStorageCleanupOperation={setOperation}
+    serverConfigResult={configResult} setServerConfigResult={setConfigResult}
     taskResult={null} setTaskResult={vi.fn()} funcomTokenResult={null} setFuncomTokenResult={vi.fn()}
     runningAction="" setRunningAction={vi.fn()} restartStartObserved={false} onError={vi.fn()} onRedeploy={vi.fn()}
     confirmAction={confirmation} restartGate={vi.fn()}
   />}</>;
 }
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
+describe("server settings save navigation", () => {
+  it.each(["succeeded", "failed"])("keeps tracking the same save and shows its %s result after returning", async status => {
+    vi.useFakeTimers();
+    const task = { id: "settings", status: "running", logLines: [{ line: "Restarting director so the settings can be published..." }] };
+    vi.mocked(serverApi.saveConfig).mockResolvedValue({ task } as Awaited<ReturnType<typeof serverApi.saveConfig>>);
+    mocks.task.mockResolvedValue({ task: { ...task, logLines: [{ line: "Restarting Overmap so the updated network addresses can be used..." }] } });
+    await act(async () => { render(<Harness />); });
+    fireEvent.change(screen.getByLabelText("Current Server Title"), { target: { value: "Test Server" } });
+    fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "local" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save Settings" })); });
+    const navigate = () => fireEvent.click(screen.getByRole("button", { name: "Navigate" }));
+    navigate();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    navigate();
+    expect(screen.getByText(/Restarting Overmap/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save Settings" })).toBeDisabled();
+    navigate();
+    mocks.task.mockResolvedValue({ task: { ...task, status } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+    navigate();
+    expect(screen.getByText(status === "succeeded" ? /Settings Saved Successfully/ : /Settings Save Failed/)).toBeVisible();
+    expect(serverApi.saveConfig).toHaveBeenCalledTimes(1);
+  });
+});
 describe("storage cleanup navigation", () => {
   it("explains host-wide image removal and runs nothing when confirmation is declined", async () => {
     confirmation.mockResolvedValueOnce(false);

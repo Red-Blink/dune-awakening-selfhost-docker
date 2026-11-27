@@ -159,6 +159,12 @@ stop_temporary_postgres() {
 
 cleanup_update_state() {
   local rc=$?
+  if [[ ${tank_stage_image:-} =~ ^redblink-dune-tank-stage:[a-f0-9]{64}$ ]]; then
+    docker image rm "$tank_stage_image" >/dev/null 2>&1 || true
+  fi
+  if [[ ${tank_stage:-} =~ ^/srv/dune/server/\.tank-update\.[a-zA-Z0-9]+$ ]]; then
+    docker compose exec -T orchestrator rm -rf -- "$tank_stage" || true
+  fi
   if [ "$rc" -ne 0 ] && [ "${stack_was_stopped:-0}" = "1" ]; then
     stop_temporary_postgres
   fi
@@ -810,14 +816,6 @@ except (ValueError, AttributeError):
     sys.exit(2)' "$json"
 }
 
-# Switches Tanks off and only reports success once the settings say so.
-auto_tanks_disable_confirmed() {
-  local rc=0
-  runtime/scripts/experimental-tanks.sh apply false || return 1
-  auto_tanks_state || rc=$?
-  [ "$rc" -eq 1 ]
-}
-
 auto_tanks_write_pending() {
   local build="$1" base_version="$2" tmp
   tmp="${AUTO_TANKS_FILE}.$$"
@@ -959,7 +957,7 @@ run_auto_update_policy() {
     return 0
   }
 
-  local check_log check_rc remote_build now first_seen sent_checkpoints players age_seconds max_wait_seconds tanks_rc console_rc=0
+  local check_log check_rc remote_build now first_seen sent_checkpoints players age_seconds max_wait_seconds console_rc=0
   check_log="$(mktemp)"
   set +e
   "${DUNE_AUTO_UPDATE_SELF:-$0}" check >"$check_log" 2>&1
@@ -993,11 +991,6 @@ run_auto_update_policy() {
   remote_build="$(awk -F: '/Remote build:/ { gsub(/^[[:space:]]+/, "", $2); print $2; exit }' "$check_log")"
   remote_build="${remote_build:-unknown}"
   rm -f "$check_log"
-  # Without Tank management the update cannot run while Tanks are enabled, so
-  # stop before players are warned about a restart that would not happen.
-  if [ -f runtime/generated/experimental-tanks.json ] && [ "${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}" != "1" ]; then
-    runtime/scripts/experimental-tanks.sh update-guard
-  fi
 
   now="$(date +%s)"
   first_seen="$now"
@@ -1037,26 +1030,6 @@ run_auto_update_policy() {
       echo "Max wait reached with $players player(s) online; applying update now."
     else
       echo "Server is empty; applying pending update."
-    fi
-  fi
-
-  if [ -f runtime/generated/experimental-tanks.json ]; then
-    if [ "${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}" = "1" ]; then
-      tanks_rc=0
-      auto_tanks_state || tanks_rc=$?
-      if [ "$tanks_rc" -eq 0 ]; then
-        echo "Regis Tanks are enabled. Disabling them before the game update."
-        auto_tanks_write_pending "$(auto_tanks_json_field "$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" build 2>/dev/null || echo unknown)" "$(auto_console_version)"
-        if ! auto_tanks_disable_confirmed; then
-          if auto_tanks_state; then rm -f "$AUTO_TANKS_FILE"; fi
-          echo "Regis Tanks could not be disabled. The game update was not started."
-          return 1
-        fi
-        echo "Regis Tanks are disabled."
-      elif [ "$tanks_rc" -ne 1 ]; then
-        echo "Regis Tanks state could not be read. The game update was not started."
-        return 1
-      fi
     fi
   fi
 
@@ -1341,11 +1314,6 @@ if [ "$cmd" != "run" ] && [ "$cmd" != "apply" ] && [ "$cmd" != "install" ]; then
 fi
 
 # Own the same lifecycle lock as startup, shutdown and automatic recovery for
-if [ -f runtime/generated/experimental-tanks.json ]; then
-  runtime/scripts/experimental-tanks.sh update-guard
-fi
-
-# Own the same lifecycle lock as startup, shutdown and automatic recovery for
 # the entire update, including its final startup. Stopping the Autoscaler alone
 # does not stop recovery already running in the Coriolis Coordinator.
 if [ "${DUNE_BATTLEGROUP_LIFECYCLE_LOCK_HELD:-0}" != "1" ]; then
@@ -1361,6 +1329,9 @@ if [ "${DUNE_BATTLEGROUP_LIFECYCLE_LOCK_HELD:-0}" != "1" ]; then
 fi
 
 if [ "$skip_preflight" = "1" ]; then
+  if [ -f runtime/generated/experimental-tanks.json ]; then
+    runtime/scripts/experimental-tanks.sh update-guard
+  fi
   echo
   echo "=== Bootstrap/install mode ==="
   echo "Skipping update availability check because init needs assets/images/db setup even if Steam is already current."
@@ -1368,9 +1339,11 @@ else
   echo
   echo "=== Pre-flight: check Steam for available update ==="
   set +e
-  "$0" check
+  check_output="$("$0" check)"
   check_rc=$?
   set -e
+  printf '%s\n' "$check_output"
+  remote_build="$(awk '/^Remote build:/ {print $3; exit}' <<<"$check_output")"
 
   case "$check_rc" in
     0)
@@ -1439,6 +1412,46 @@ docker compose exec -T \
   -e DUNE_SKIP_DISK_CHECK="${DUNE_SKIP_DISK_CHECK:-}" \
   orchestrator dune preflight
 
+tank_stage=""
+if [ "$cmd" != "install" ] && [ -f runtime/generated/experimental-tanks.json ]; then
+  tanks_enabled="$(runtime/scripts/experimental-tanks.sh update-enabled)"
+  if [ "$tanks_enabled" = yes ]; then
+    echo "DUNE_GAME_ASSETS_PHASE=Checking Regis Tank compatibility"
+    tank_stage="$(docker compose exec -T -u dune orchestrator mktemp -d /srv/dune/server/.tank-update.XXXXXXXX)"
+    [[ "$tank_stage" =~ ^/srv/dune/server/\.tank-update\.[a-zA-Z0-9]+$ ]] || exit 1
+    docker compose exec -T -u dune orchestrator bash -eu -c '
+      stage=$1
+      mkdir "$stage/install" "$stage/home"
+      cp -a --reflink=auto /srv/dune/steam "$stage/steam"
+      cp -a --reflink=auto /srv/dune/server/{images,scripts,steamapps} "$stage/install/"
+    ' stage "$tank_stage"
+    stage_attempts="$(positive_integer_or_default "${DUNE_STEAMCMD_MAX_ATTEMPTS:-3}" 3)"
+    staged_build=""
+    for ((attempt=1; attempt<=stage_attempts; attempt++)); do
+      if docker compose exec -T -u dune -e HOME="$tank_stage/home" -e DUNE_HOME="$tank_stage/home" \
+        -e DUNE_SERVER_DIR="$tank_stage/install" -e DUNE_STEAM_DIR="$tank_stage/steam" -e APP_ID="$APP_ID" orchestrator dune download; then
+        staged_build="$(docker compose exec -T orchestrator awk -F '"' '/"buildid"/ {print $4; exit}' "$tank_stage/install/steamapps/appmanifest_${APP_ID}.acf")"
+        [[ "$remote_build" =~ ^[0-9]+$ && "$remote_build" = "$staged_build" ]] && break
+      fi
+      if ((attempt < stage_attempts)); then sleep "$(positive_integer_or_default "${DUNE_STEAMCMD_RETRY_SLEEP:-20}" 20)"; fi
+    done
+    if [[ ! "$remote_build" =~ ^[0-9]+$ || "$remote_build" != "$staged_build" ]]; then
+      echo "Steam supplied a different build than the update check. Retry the update before switching builds." >&2
+      exit 1
+    fi
+    candidate="$(docker compose exec -T orchestrator python3 - --stage-world "$tank_stage/install/images" < runtime/scripts/verify-game-images.py)" || candidate=""
+    if [ -n "$candidate" ]; then
+      tank_stage_image="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("temporaryTag", ""))' <<< "$candidate")"
+    fi
+    if [ -z "$candidate" ] || ! runtime/scripts/experimental-tanks.sh prepare-update "$candidate"; then
+      echo "DUNE_GAME_UPDATE_PAUSED=TANK_COMPATIBILITY"
+      echo "Game Update Paused. Regis Tanks could not be verified for this build. Wait for support or disable Regis Tanks in Settings and retry. Stock Hagga can remove existing Tanks."
+      exit 1
+    fi
+    echo "Regis Tank image verified. Continuing with Tanks enabled."
+  fi
+fi
+
 if [ "$cmd" != "install" ]; then
   if [ "$postgres_was_running" != "1" ]; then
     echo
@@ -1488,7 +1501,11 @@ steam_dns_hint=0
 steam_content_host_hint=0
 steam_dns_host=""
 
-while [ "$steam_attempt" -le "$steam_attempt_limit" ]; do
+if [ -n "$tank_stage" ]; then
+  docker compose exec -T -u dune orchestrator python3 - "$tank_stage/install" "$APP_ID" < runtime/scripts/install-staged-game.py
+  steam_ok=1
+fi
+while [ "$steam_ok" != "1" ] && [ "$steam_attempt" -le "$steam_attempt_limit" ]; do
   echo
   echo "SteamCMD install attempt $steam_attempt/$steam_attempt_limit..."
 
@@ -1678,6 +1695,10 @@ echo
 echo "DUNE_GAME_ASSETS_PHASE=Detecting image tags"
 echo "=== Detect loaded image tags ==="
 runtime/scripts/detect-image-tags.sh --from-bundle
+if [ -n "$tank_stage" ]; then
+  runtime/scripts/experimental-tanks.sh finish-update
+  docker compose exec -T orchestrator mv -f -- "$tank_stage/install/steamapps/appmanifest_${APP_ID}.acf" "/srv/dune/server/steamapps/appmanifest_${APP_ID}.acf"
+fi
 
 echo
 echo "=== Current tags ==="

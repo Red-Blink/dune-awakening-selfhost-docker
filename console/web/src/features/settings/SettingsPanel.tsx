@@ -14,6 +14,7 @@ import { ApiKeysSection } from "./ApiKeysSection";
 import { ExperimentalFeatures } from "./ExperimentalFeatures";
 import { EncryptedApiSection } from "./EncryptedApiSection";
 import { ConsoleAccessNotice, type ConsoleAccessStatus } from "./ConsoleAccessNotice";
+import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 
 // Authenticator apps display codes as "123 456" and the server strips whitespace
 // (auth/totp.js) precisely so a paste of that form validates. Do not add
@@ -634,33 +635,6 @@ export function SettingsPanel({ onPasswordChanged, onOpenAccessControl, publicLi
           </div>
         </div>}
       </div></PermissionGate>
-      {/* Rendered OUTSIDE the secondFactorEnrolled gate. While these codes are on
-          screen they are the ONLY copy that will ever exist -- the previous sheet
-          is already invalidated server-side and only digests persist. Gating them
-          on a flag that any /api/auth/me re-read can flip to false would let the
-          panel's own Refresh button, a few rows above, destroy them. */}
-      {regeneratedCodes && <div className="playerAdmin_toggle open">
-        <div className="playerAdmin_toggleBody">
-          <div className="settings-recovery-codes">
-            <RecoveryCodesPanel
-              codes={regeneratedCodes}
-              heading="Save your new recovery codes"
-              intro="These 10 codes replace your previous set, which no longer works. They are shown once, right now, and cannot be retrieved again."
-              confirmLabel="Done"
-              onConfirm={() => { setRegeneratedCodes(null); setRegenerateAcknowledged(false); }}
-              acknowledged={regenerateAcknowledged}
-              onAcknowledgedChange={setRegenerateAcknowledged}
-              headingLevel="h3"
-            />
-          </div>
-        </div>
-      </div>}
-      {secondFactorUnavailable && <p className="attention-text">
-        This console&apos;s two-factor state could not be read, so password changes and
-        recovery-code regeneration are unavailable right now. Do not delete
-        <code> runtime/generated/console-second-factor.json</code>. Follow the recovery
-        guidance shown on the sign in page.
-      </p>}
       {(secondFactorEnrolled || consoleTotpAvailable) && !secondFactorUnavailable && !regeneratedCodes && <div className={`playerAdmin_toggle ${twoFactorOpen ? "open" : ""}`}>
         <button className="playerAdmin_toggleHeader" aria-label={twoFactorOpen ? "Collapse Two Factor Authentication" : "Expand Two Factor Authentication"} onClick={() => setTwoFactorOpen(!twoFactorOpen)}>
           <ShieldCheck size={20} aria-hidden="true" /><span className="settings-option-copy"><span>Two Factor Authentication</span><small>Add an authenticator code to your Console password.</small></span>
@@ -863,108 +837,158 @@ export function SettingsPanel({ onPasswordChanged, onOpenAccessControl, publicLi
     {serverListingError && <p className="error settings-server-listing-error">{serverListingError}</p>}
     {serverListingVisible && serverListingEnabled && publicDirectory.probeError &&
       <p className="error settings-server-listing-error">Server listing issue: {publicDirectory.probeError}</p>}
-    <div className="settings-section-stack">
-      <RuntimeSettingsSummary settings={settings} />
-      <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
-      <section className="settings-account-group" aria-labelledby="settings-security-heading">
-        <header className="settings-account-group-heading"><ShieldCheck size={22} aria-hidden="true" /><div><h3 id="settings-security-heading">Account Security</h3><p>Manage your Console password and authenticator protection.</p></div></header>
-        <div className="settings-account-group-options">{passwordSignInSection}</div>
-      </section>
-      <section className="settings-account-group" aria-labelledby="settings-discord-heading">
-        <header className="settings-account-group-heading"><Bot size={22} aria-hidden="true" /><div><h3 id="settings-discord-heading">Discord</h3><p>Connect your community and manage Discord access.</p></div></header>
-        <div className="settings-account-group-options">
-          {discordOAuthSection}
-          {discordOAuthConfigured && <div className="settings-access-link"><ShieldCheck size={18} aria-hidden="true" /><div><strong>Manage Member Access</strong><p>Choose what admins, moderators, and players can do in the Console.</p><a href="?tab=Access%20Control" onClick={onOpenAccessControl ? (event) => { event.preventDefault(); onOpenAccessControl(); } : undefined}>Open Access Control</a></div></div>}
-          <div className={`playerAdmin_toggle ${discordBotOpen ? "open" : ""}`}>
-            <button className="playerAdmin_toggleHeader" aria-label={discordBotOpen ? "Collapse Server Bot" : "Expand Server Bot"} aria-expanded={discordBotOpen} onClick={() => setDiscordBotOpen(!discordBotOpen)}><Bot size={20} aria-hidden="true" /><span className="settings-option-copy"><span>Server Bot</span><small>Commands and notifications in your Discord server.</small></span>{discordBotOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
-            {discordBotOpen && <DiscordBotSection />}
+    {(regeneratedCodes || secondFactorUnavailable) && <div className="settings-section-stack">
+      {/* Rendered OUTSIDE the LayoutZone, so a saved layout cannot hide or
+          collapse it, and OUTSIDE the secondFactorEnrolled gate. While these codes are on
+          screen they are the ONLY copy that will ever exist -- the previous sheet
+          is already invalidated server-side and only digests persist. Gating them
+          on a flag that any /api/auth/me re-read can flip to false would let the
+          panel's own Refresh button, a few rows above, destroy them. */}
+      {regeneratedCodes && <div className="playerAdmin_toggle open">
+        <div className="playerAdmin_toggleBody">
+          <div className="settings-recovery-codes">
+            <RecoveryCodesPanel
+              codes={regeneratedCodes}
+              heading="Save your new recovery codes"
+              intro="These 10 codes replace your previous set, which no longer works. They are shown once, right now, and cannot be retrieved again."
+              confirmLabel="Done"
+              onConfirm={() => { setRegeneratedCodes(null); setRegenerateAcknowledged(false); }}
+              acknowledged={regenerateAcknowledged}
+              onAcknowledgedChange={setRegenerateAcknowledged}
+              headingLevel="h3"
+            />
           </div>
         </div>
-      </section>
-      <PermissionGate action="settings:write"><div className={`playerAdmin_toggle settings-server-startup-toggle ${serverStartupOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={serverStartupOpen ? "Collapse Server Startup" : "Expand Server Startup"} onClick={() => setServerStartupOpen(!serverStartupOpen)}>
-          {serverStartupOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          <span>Server Startup</span>
-        </button>
-        {serverStartupOpen && <div className="playerAdmin_toggleBody settings-server-startup-body">
-          <div className="settings-server-startup-copy">
-            <strong>Start Battlegroup Automatically</strong>
-            <p className="muted">The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.</p>
+      </div>}
+      {secondFactorUnavailable && <p className="attention-text">
+        This console&apos;s two-factor state could not be read, so password changes and
+        recovery-code regeneration are unavailable right now. Do not delete
+        <code> runtime/generated/console-second-factor.json</code>. Follow the recovery
+        guidance shown on the sign in page.
+      </p>}
+    </div>}
+    <LayoutZone page="Settings" className="settings-section-stack">
+      <LayoutWidget id="settings.runtime" widgetTitle="Runtime Configuration & Files">
+        <RuntimeSettingsSummary settings={settings} />
+      </LayoutWidget>
+      <LayoutWidget id="settings.access" widgetTitle="Console Access">
+        <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
+      </LayoutWidget>
+      <LayoutWidget id="settings.password" widgetTitle="Account Security">
+        <section className="settings-account-group" aria-labelledby="settings-security-heading">
+          <header className="settings-account-group-heading"><ShieldCheck size={22} aria-hidden="true" /><div><h3 id="settings-security-heading">Account Security</h3><p>Manage your Console password and authenticator protection.</p></div></header>
+          <div className="settings-account-group-options">{passwordSignInSection}</div>
+        </section>
+      </LayoutWidget>
+      <LayoutWidget id="settings.discord" widgetTitle="Discord">
+        <section className="settings-account-group" aria-labelledby="settings-discord-heading">
+          <header className="settings-account-group-heading"><Bot size={22} aria-hidden="true" /><div><h3 id="settings-discord-heading">Discord</h3><p>Connect your community and manage Discord access.</p></div></header>
+          <div className="settings-account-group-options">
+            {discordOAuthSection}
+            {discordOAuthConfigured && <div className="settings-access-link"><ShieldCheck size={18} aria-hidden="true" /><div><strong>Manage Member Access</strong><p>Choose what admins, moderators, and players can do in the Console.</p><a href="?tab=Access%20Control" onClick={onOpenAccessControl ? (event) => { event.preventDefault(); onOpenAccessControl(); } : undefined}>Open Access Control</a></div></div>}
+            <div className={`playerAdmin_toggle ${discordBotOpen ? "open" : ""}`}>
+              <button className="playerAdmin_toggleHeader" aria-label={discordBotOpen ? "Collapse Server Bot" : "Expand Server Bot"} aria-expanded={discordBotOpen} onClick={() => setDiscordBotOpen(!discordBotOpen)}><Bot size={20} aria-hidden="true" /><span className="settings-option-copy"><span>Server Bot</span><small>Commands and notifications in your Discord server.</small></span>{discordBotOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+              {discordBotOpen && <DiscordBotSection />}
+            </div>
           </div>
-          <label className={`switch-checkbox settings-server-startup-control ${autoStartBattlegroup ? "enabled" : "disabled"}`}>
-            <PermissionGate action="settings:write"><input
-              type="checkbox"
-              disabled={serverStartupSaving || settings === null}
-              checked={autoStartBattlegroup}
-              onChange={(event) => { void changeServerStartup(event.target.checked); }}
-            /></PermissionGate>
-            <span className="switch-label">Automatic Startup:</span>
-            <strong className="switch-state">{serverStartupSaving ? "Saving" : autoStartBattlegroup ? "Enabled" : "Disabled"}</strong>
-          </label>
-          {serverStartupResult && <span className={`inline-task-result settings-server-startup-result result-${serverStartupResult.status === "succeeded" ? "ok" : serverStartupResult.status === "failed" ? "fail" : "running"}`}>
-            <strong className={serverStartupResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serverStartupResult.title, serverStartupResult.status === "running")}</strong>
-            {serverStartupResult.message && <span className="inline-task-message">{formatResultMessage(serverStartupResult.message)}</span>}
-          </span>}
-        </div>}
-      </div></PermissionGate>
-      <PermissionGate action="settings:change-port"><div id="settings-console-connection" className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>
-        {webPortOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Change the browser port used by this web console.</p>
-          <p className="attention-text">After saving, this page will stop responding on port {currentPort}. Open the new address shown in the result message.</p>
-          <div className="settings-password-grid settings-web-port-grid">
-            <label>Console Port<input disabled={webPortSaving} type="number" min="1" max="65535" step="1" value={webPort} onChange={(event) => setWebPort(event.target.value.replace(/[^\d]/g, "").slice(0, 5))} placeholder="8088" /></label>
-          </div>
-          <div className="action-row">
-            <PermissionGate action="settings:change-port"><button disabled={webPortSaving || Boolean(webPortRedirectUrl) || !webPort || webPort === currentPort} onClick={() => { void changeWebPort(); }}>{webPortSaving ? "Saving..." : "Save And Restart Console"}</button></PermissionGate>
-            {webPortResult && <span className={`inline-task-result result-${webPortResult.status === "succeeded" ? "ok" : webPortResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={webPortResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(webPortResult.title, webPortResult.status === "running")}</strong>
-              <span className="inline-task-message">{formatWebPortResultMessage(webPortResult, webPortRedirectUrl, webPortRedirectCountdown)}</span>
+        </section>
+      </LayoutWidget>
+      <PermissionGate action="settings:write"><LayoutWidget id="settings.serverStartup" widgetTitle="Server Startup">
+        <div className={`playerAdmin_toggle settings-server-startup-toggle ${serverStartupOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={serverStartupOpen ? "Collapse Server Startup" : "Expand Server Startup"} onClick={() => setServerStartupOpen(!serverStartupOpen)}>
+            {serverStartupOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <span>Server Startup</span>
+          </button>
+          {serverStartupOpen && <div className="playerAdmin_toggleBody settings-server-startup-body">
+            <div className="settings-server-startup-copy">
+              <strong>Start Battlegroup Automatically</strong>
+              <p className="muted">The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.</p>
+            </div>
+            <label className={`switch-checkbox settings-server-startup-control ${autoStartBattlegroup ? "enabled" : "disabled"}`}>
+              <PermissionGate action="settings:write"><input
+                type="checkbox"
+                disabled={serverStartupSaving || settings === null}
+                checked={autoStartBattlegroup}
+                onChange={(event) => { void changeServerStartup(event.target.checked); }}
+              /></PermissionGate>
+              <span className="switch-label">Automatic Startup:</span>
+              <strong className="switch-state">{serverStartupSaving ? "Saving" : autoStartBattlegroup ? "Enabled" : "Disabled"}</strong>
+            </label>
+            {serverStartupResult && <span className={`inline-task-result settings-server-startup-result result-${serverStartupResult.status === "succeeded" ? "ok" : serverStartupResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={serverStartupResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serverStartupResult.title, serverStartupResult.status === "running")}</strong>
+              {serverStartupResult.message && <span className="inline-task-message">{formatResultMessage(serverStartupResult.message)}</span>}
             </span>}
-          </div>
-          <HttpsSetup initiallyOpen={httpsSetupOpen} />
-        </div>}
-      </div></PermissionGate>
-      <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>
-        {apiKeysOpen && <div className="playerAdmin_toggleBody"><ApiKeysSection confirmAction={confirmAction} /></div>}
-      </div>
-      <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
-        {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
-      </div>
-      <ExperimentalFeatures confirmAction={confirmAction} />
-      {serverListingVisible && <PermissionGate action="settings:write"><div className={`playerAdmin_toggle settings-public-profile-toggle ${publicProfileOpen ? "open" : ""}`}>
-        <button className="playerAdmin_toggleHeader" aria-label={publicProfileOpen ? "Collapse Public Listing Profile" : "Expand Public Listing Profile"} onClick={() => setPublicProfileOpen(!publicProfileOpen)}>
-          {publicProfileOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          <span>Public Listing Profile</span>
-        </button>
-        {publicProfileOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from {publicListingUrl
-            ? <a className="settings-server-page-link" href={publicListingUrl} target="_blank" rel="noreferrer">[Your Server Page]</a>
-            : "[Your Server Page]"}, then paste it below.</p>
-          <label className="settings-discord-field">
-            <span className="field-label-row"><span className="settings-discord-label">Generated Claim Code</span></span>
-            <input
-              disabled={publicProfileSaving}
-              value={claimCode}
-              onChange={(event) => setClaimCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 14))}
-              placeholder="ABCD-EF12-3456"
-              autoComplete="off"
-            />
-          </label>
-          <div className="action-row">
-            <PermissionGate action="settings:write"><button disabled={publicProfileSaving || claimCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => { void verifyListingClaim(); }}>
-              {publicProfileSaving ? "Verifying..." : "Verify Generated Code"}
-            </button></PermissionGate>
-            {publicProfileResult && <span className={`inline-task-result result-${publicProfileResult.status === "succeeded" ? "ok" : publicProfileResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={publicProfileResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(publicProfileResult.title, publicProfileResult.status === "running")}</strong>
-              {publicProfileResult.message && <span className="inline-task-message">{formatResultMessage(publicProfileResult.message)}</span>}
-            </span>}
-          </div>
-        </div>}
-      </div></PermissionGate>}
-    </div>
+          </div>}
+        </div>
+      </LayoutWidget></PermissionGate>
+      <PermissionGate action="settings:change-port"><LayoutWidget id="settings.webPort" widgetTitle="Web Console Port">
+        <div id="settings-console-connection" className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>
+          {webPortOpen && <div className="playerAdmin_toggleBody">
+            <p className="muted">Change the browser port used by this web console.</p>
+            <p className="attention-text">After saving, this page will stop responding on port {currentPort}. Open the new address shown in the result message.</p>
+            <div className="settings-password-grid settings-web-port-grid">
+              <label>Console Port<input disabled={webPortSaving} type="number" min="1" max="65535" step="1" value={webPort} onChange={(event) => setWebPort(event.target.value.replace(/[^\d]/g, "").slice(0, 5))} placeholder="8088" /></label>
+            </div>
+            <div className="action-row">
+              <PermissionGate action="settings:change-port"><button disabled={webPortSaving || Boolean(webPortRedirectUrl) || !webPort || webPort === currentPort} onClick={() => { void changeWebPort(); }}>{webPortSaving ? "Saving..." : "Save And Restart Console"}</button></PermissionGate>
+              {webPortResult && <span className={`inline-task-result result-${webPortResult.status === "succeeded" ? "ok" : webPortResult.status === "failed" ? "fail" : "running"}`}>
+                <strong className={webPortResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(webPortResult.title, webPortResult.status === "running")}</strong>
+                <span className="inline-task-message">{formatWebPortResultMessage(webPortResult, webPortRedirectUrl, webPortRedirectCountdown)}</span>
+              </span>}
+            </div>
+            <HttpsSetup initiallyOpen={httpsSetupOpen} />
+          </div>}
+        </div>
+      </LayoutWidget></PermissionGate>
+      <LayoutWidget id="settings.apiKeys" widgetTitle="API Keys">
+        <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>
+          {apiKeysOpen && <div className="playerAdmin_toggleBody"><ApiKeysSection confirmAction={confirmAction} /></div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.encryptedApi" widgetTitle="Encrypted API Access">
+        <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
+          {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.experimental" widgetTitle="Experimental Features">
+        <ExperimentalFeatures confirmAction={confirmAction} />
+      </LayoutWidget>
+      {serverListingVisible && <PermissionGate action="settings:write"><LayoutWidget id="settings.publicProfile" widgetTitle="Public Listing Profile">
+        <div className={`playerAdmin_toggle settings-public-profile-toggle ${publicProfileOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={publicProfileOpen ? "Collapse Public Listing Profile" : "Expand Public Listing Profile"} onClick={() => setPublicProfileOpen(!publicProfileOpen)}>
+            {publicProfileOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <span>Public Listing Profile</span>
+          </button>
+          {publicProfileOpen && <div className="playerAdmin_toggleBody">
+            <p className="muted">Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from {publicListingUrl
+              ? <a className="settings-server-page-link" href={publicListingUrl} target="_blank" rel="noreferrer">[Your Server Page]</a>
+              : "[Your Server Page]"}, then paste it below.</p>
+            <label className="settings-discord-field">
+              <span className="field-label-row"><span className="settings-discord-label">Generated Claim Code</span></span>
+              <input
+                disabled={publicProfileSaving}
+                value={claimCode}
+                onChange={(event) => setClaimCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 14))}
+                placeholder="ABCD-EF12-3456"
+                autoComplete="off"
+              />
+            </label>
+            <div className="action-row">
+              <PermissionGate action="settings:write"><button disabled={publicProfileSaving || claimCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => { void verifyListingClaim(); }}>
+                {publicProfileSaving ? "Verifying..." : "Verify Generated Code"}
+              </button></PermissionGate>
+              {publicProfileResult && <span className={`inline-task-result result-${publicProfileResult.status === "succeeded" ? "ok" : publicProfileResult.status === "failed" ? "fail" : "running"}`}>
+                <strong className={publicProfileResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(publicProfileResult.title, publicProfileResult.status === "running")}</strong>
+                {publicProfileResult.message && <span className="inline-task-message">{formatResultMessage(publicProfileResult.message)}</span>}
+              </span>}
+            </div>
+          </div>}
+        </div>
+      </LayoutWidget></PermissionGate>}
+    </LayoutZone>
   </section>;
 }
 

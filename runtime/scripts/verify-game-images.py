@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify the complete downloaded Docker bundle before publishing its tags."""
 import json
+import hashlib
+import io
 import re
 import subprocess
 import sys
@@ -88,9 +90,63 @@ def inspect_image(tag):
     return rows[0]
 
 
+def stage_world(directory):
+    """Load the incoming world under a private tag, even for a same-tag republish."""
+    images = bundle_images(directory)
+    tag, _ = images[WORLD]
+    with tarfile.open(directory / "battlegroup/server.tar") as archive:
+        rows = metadata(archive, "manifest.json")
+        index = metadata(archive, "index.json")
+        if len(rows) != 1 or rows[0]["RepoTags"] != [tag] or len(index["manifests"]) != 1:
+            raise ValueError("Cannot isolate the incoming world image.")
+        descriptor = index["manifests"][0]
+        digest = descriptor["digest"]
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ValueError("Invalid world image digest.")
+        manifest_path = "blobs/sha256/" + digest[7:]
+        config_digest = metadata(archive, manifest_path)["config"]["digest"]
+        if "sha256:" + hashlib.sha256(archive.extractfile(manifest_path).read()).hexdigest() != digest:
+            raise ValueError("World image manifest digest mismatch.")
+        config_path = rows[0]["Config"]
+        metadata(archive, config_path)
+        if "sha256:" + hashlib.sha256(archive.extractfile(config_path).read()).hexdigest() != config_digest:
+            raise ValueError("World image configuration digest mismatch.")
+        reference = "redblink-dune-tank-stage:" + digest[7:]
+        existing = subprocess.run(["docker", "image", "inspect", "--format", "{{.Id}}", digest],
+                                  capture_output=True, text=True)
+        if existing.returncode == 0 and existing.stdout.strip() == digest:
+            reference = digest
+        else:
+            rows[0]["RepoTags"] = [reference]
+            descriptor["annotations"] = {"io.containerd.image.name": "docker.io/library/" + reference,
+                                         "org.opencontainers.image.ref.name": digest[7:]}
+            replacements = {"manifest.json": rows, "index.json": index}
+            with subprocess.Popen(["docker", "load"], stdin=subprocess.PIPE, stdout=sys.stderr) as load:
+                with tarfile.open(fileobj=load.stdin, mode="w|") as output:
+                    for entry in archive:
+                        if entry.name in replacements:
+                            data = json.dumps(replacements[entry.name]).encode()
+                            entry.size = len(data)
+                            output.addfile(entry, io.BytesIO(data))
+                        elif entry.name != "repositories":
+                            output.addfile(entry, archive.extractfile(entry) if entry.isfile() else None)
+                load.stdin.close()
+                if load.wait():
+                    raise ValueError("Cannot load the isolated world image.")
+        loaded = inspect_image(reference)
+        identifier = loaded["Id"]
+        if identifier not in (digest, config_digest) or loaded["RootFS"]["Layers"] != images[WORLD][1]["rootfs"]["diff_ids"]:
+            raise ValueError("Staged world image identity mismatch.")
+        return {"tag": tag.rpartition(":")[2], "image": identifier, "digest": digest, "config": config_digest,
+                "temporaryTag": reference if reference != digest else ""}
+
+
 def main():
     directory = Path(sys.argv[1] if len(sys.argv) > 1 else "/srv/dune/server/images")
     try:
+        if sys.argv[1:2] == ["--stage-world"]:
+            print(json.dumps(stage_world(Path(sys.argv[2]))))
+            return 0
         images = bundle_images(directory)
         verify_loaded(images, inspect_image)
         print("DUNE_WORLD_IMAGE_TAG=" + images[WORLD][0].rpartition(":")[2])

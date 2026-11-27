@@ -38,16 +38,17 @@ async function openPanel() {
   fireEvent.click(await screen.findByRole("button", { name: "Expand Automatic Game Updates" }));
 }
 
-test("the Console and Regis Tanks options default to off and are saved with the other settings", async () => {
+test("Tank protection is automatic while Console updates remain optional", async () => {
   vi.mocked(updatesApi.autoGameStatus).mockResolvedValue(status("Update Console:       0\nManage Regis Tanks:   0"));
   mount(); await openPanel();
   const consoleToggle = await screen.findByRole("checkbox", { name: "Update the Console after a game update" });
-  const tanksToggle = screen.getByRole("checkbox", { name: "Disable Regis Tanks before the update and restore them afterwards" });
-  expect(consoleToggle).not.toBeChecked(); expect(tanksToggle).not.toBeChecked();
-  fireEvent.click(consoleToggle); fireEvent.click(tanksToggle);
+  expect(screen.queryByRole("checkbox", { name: /Regis Tanks/i })).toBeNull();
+  expect(screen.getByText(/compatible updates keep them enabled/i)).toBeVisible();
+  expect(consoleToggle).not.toBeChecked();
+  fireEvent.click(consoleToggle);
   fireEvent.click(screen.getByRole("button", { name: "Save Auto Updates" }));
   await waitFor(() => expect(updatesApi.saveAutoGame).toHaveBeenCalledWith(expect.objectContaining({
-    enabled: true, updateConsole: true, manageTanks: true, confirmation: "SAVE AUTO GAME UPDATES"
+    enabled: true, updateConsole: true, manageTanks: false, confirmation: "SAVE AUTO GAME UPDATES"
   })));
 });
 
@@ -55,7 +56,7 @@ test("saved options are shown when the panel opens", async () => {
   vi.mocked(updatesApi.autoGameStatus).mockResolvedValue(status("Update Console:       1\nManage Regis Tanks:   1"));
   mount(); await openPanel();
   await waitFor(() => expect(screen.getByRole("checkbox", { name: "Update the Console after a game update" })).toBeChecked());
-  expect(screen.getByRole("checkbox", { name: "Disable Regis Tanks before the update and restore them afterwards" })).toBeChecked();
+  expect(screen.queryByRole("checkbox", { name: /Regis Tanks/i })).toBeNull();
 });
 
 test("a pending Regis Tanks restore is reported", async () => {
