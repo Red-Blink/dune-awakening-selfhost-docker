@@ -400,7 +400,7 @@ export function researchProductGroup(itemKey, category = "") {
 
 export function validateTemplateId(value) {
   const raw = String(value || "").trim();
-  if (/^[A-Za-z0-9_./:-]{1,240}$/.test(raw)) return raw;
+  if (/^[A-Za-z0-9_./:&-]{1,240}$/.test(raw)) return raw;
   throw new Error("Invalid item template/id");
 }
 

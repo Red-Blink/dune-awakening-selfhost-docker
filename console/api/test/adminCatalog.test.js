@@ -155,6 +155,20 @@ test("mission placeables are searchable and resolve to their native building pat
   }
 });
 
+test("Building Sets with \"&\" in their ids load and resolve by id and name", () => {
+  const rewards = [
+    ["Duke Leto's Desk & Chair", "MTX_Leto_Chair_&_Desk_pack_Patent"],
+    ["Reception Hall Light & Carpet Pack", "MTX_Reception_Light_&_Carpet_pack_Patent"],
+    ["Wall Reliefs & Artwork Pack", "MTX_Wall_Reliefs_&_Artwork_pack_Patent"],
+  ];
+  const unlocks = listBuildingUnlockItems(REAL_REPO_ROOT);
+  for (const [name, itemId] of rewards) {
+    assert.deepEqual(unlocks.filter((row) => row.itemId === itemId).map((row) => row.name), [name]);
+    assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemId }).source, "BuildingSets");
+    assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemName: name }).itemId, itemId);
+  }
+});
+
 test("Call to Adventure appears once in Building Sets and resolves by name and patent ID", () => {
   const name = "Mural: Call to Adventure";
   const itemId = "MTX_Neut_MuralPainting_03_Patent";

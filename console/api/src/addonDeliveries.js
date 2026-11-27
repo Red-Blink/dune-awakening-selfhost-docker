@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_:#.-]{1,128}$/;
-const ITEM_ID_PATTERN = /^[A-Za-z0-9_./:-]{1,240}$/;
+const ITEM_ID_PATTERN = /^[A-Za-z0-9_./:&-]{1,240}$/;
 const REWARD_TYPES = new Set(["item", "xp", "intel", "currency", "building-unlock"]);
 const MAX_TICK_DELIVERIES = 50;
 const MAX_DELIVERIES_PER_ADDON = 100_000;

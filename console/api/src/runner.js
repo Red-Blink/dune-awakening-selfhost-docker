@@ -707,7 +707,7 @@ function validateItemName(value) {
 
 function validateItemId(value) {
   const raw = String(value || "").trim();
-  if (/^[A-Za-z0-9_./:-]{1,240}$/.test(raw)) return raw;
+  if (/^[A-Za-z0-9_./:&-]{1,240}$/.test(raw)) return raw;
   throw new Error("Invalid item id");
 }
 

@@ -123,7 +123,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
       grantWhen: source.grantWhen,
       items: source.kits.length === 0 ? [] : sourceActiveKit.items?.length ? sourceActiveKit.items : itemsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
         const [nameOrId, qty = "1"] = line.split(",").map((part) => part.trim());
-        const item = /^[A-Za-z0-9_./:-]{16,}$/.test(nameOrId) ? { itemId: nameOrId } : { itemName: nameOrId };
+        const item = /^[A-Za-z0-9_./:&-]{16,}$/.test(nameOrId) ? { itemId: nameOrId } : { itemName: nameOrId };
         return { ...item, quantity: Number(qty), quality: 0, durability: grantItemDurability(), augments: [] };
       }),
       xp: sourceActiveKit.xp,

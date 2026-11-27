@@ -184,6 +184,11 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("adminGiveItem", { playerId: "FLS_TEST", itemName: "Water", quantity: 2, quality: 3 }), ["admin", "grant-item", "FLS_TEST", "Water", "2", "1", "3"]);
   assert.deepEqual(buildDuneArgs("adminGiveItemId", { playerId: "FLS_TEST", itemId: "WaterBottle_1", quantity: 2, quality: 0 }), ["admin", "grant-item-id", "FLS_TEST", "WaterBottle_1", "2", "1", "0"]);
   assert.deepEqual(buildDuneArgs("adminGiveItemId", { playerId: "FLS_TEST", itemId: "WaterBottle_1", quantity: 2, durability: 0.5, quality: 5 }), ["admin", "grant-item-id", "FLS_TEST", "WaterBottle_1", "2", "1", "5"]);
+  // Some 1.6.0 Building Sets ids contain "&"; argv and JSON carry it as plain text.
+  assert.deepEqual(buildDuneArgs("adminGiveItemId", { playerId: "FLS_TEST", itemId: "MTX_Leto_Chair_&_Desk_pack_Patent", quantity: 1 }), ["admin", "grant-item-id", "FLS_TEST", "MTX_Leto_Chair_&_Desk_pack_Patent", "1", "1", "0"]);
+  for (const itemId of ["Water;id", "Water|id", "Water$(id)", "Water`id`", "Water id", "Water\nid"]) {
+    assert.throws(() => buildDuneArgs("adminGiveItemId", { playerId: "FLS_TEST", itemId, quantity: 1 }), /Invalid item id/);
+  }
   assert.deepEqual(buildDuneArgs("adminGiveItems", { playerId: "FLS_TEST", template: "scout-ornithopter-mk6" }), ["admin", "grant-template", "FLS_TEST", "scout-ornithopter-mk6"]);
   assert.deepEqual(buildDuneArgs("adminSetSkillPoints", { playerId: "FLS_TEST", points: 12 }), ["admin", "skill-points", "FLS_TEST", "12"]);
   assert.deepEqual(buildDuneArgs("adminSetSkillModule", { playerId: "FLS_TEST", module: "Training_Test", level: 2 }), ["admin", "skill-module", "FLS_TEST", "Training_Test", "2"]);
