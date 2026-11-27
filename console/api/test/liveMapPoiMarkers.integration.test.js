@@ -127,6 +127,39 @@ test("real PostgreSQL: Fortress/House Representative/Trainer are their own categ
   });
 });
 
+test("real PostgreSQL: Polar Sink marker types land in Ores and POI's, without catching look-alikes", async (t) => {
+  await withIsolatedDatabase(t, {
+    namePrefix: "dune_poi_markers_polar",
+    unavailableLabel: "the Polar Sink POI integration test",
+    createFailLabel: "the Polar Sink POI integration test"
+  }, async (pool) => {
+    await pool.query(SCHEMA);
+    // marker_type values are the row names of DT_PolarCap_FullscreenMapMarkers
+    // (game update 1.6.0 test client).
+    await pool.query(`
+      insert into dune.map_names (map_name_id, map_name) values (12, 'PolarCap_1'), (3, 'Overmap');
+      insert into dune.markers (marker_hash_id, dimension_index, marker_type, position, payload_type, map_name_id) values
+        (1, -1, 'GlacialIce', (52189, 65712, 21927)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (2, -1, 'SalvagedPlastic', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (3, -1, 'IrradiatedParts', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (4, -1, 'PolarCave', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (5, -1, 'Dungeon', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (6, -1, 'HeatSource', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 12),
+        (7, -1, 'Overmap_Poi_Dungeon', (1, 2, 3)::dune.vector, 'EMarkerPayloadType::Default', 3);
+    `);
+    const db = pgTransactionalDb(pool);
+    const ore = await liveMapPoiMarkers(db, "PolarCap_1", "ore");
+    assert.deepEqual(ore.rows.map((r) => r.marker_type).sort(), ["GlacialIce", "IrradiatedParts", "SalvagedPlastic"]);
+    assert.equal(ore.rows.find((r) => r.marker_type === "GlacialIce").map, "PolarCap_1");
+    const poi = await liveMapPoiMarkers(db, "", "poi");
+    assert.deepEqual(poi.rows.map((r) => r.marker_type).sort(), ["Dungeon", "PolarCave"]);
+    const batch = await liveMapPoiAllMarkers(db, "");
+    const everywhere = Object.values(batch.byCategory).flat().map((r) => r.marker_type);
+    assert.ok(!everywhere.includes("HeatSource"), "HeatSource has no icon and no category");
+    assert.ok(!everywhere.includes("Overmap_Poi_Dungeon"), "the exact Dungeon pattern must not catch Overmap_Poi_Dungeon");
+  });
+});
+
 test("real PostgreSQL: liveMapPoiMarkers throws on an unknown category", async (t) => {
   await withIsolatedDatabase(t, {
     namePrefix: "dune_poi_markers_unknown",

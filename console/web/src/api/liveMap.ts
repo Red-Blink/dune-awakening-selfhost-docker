@@ -35,6 +35,8 @@ export type LiveMapConfig = {
   maxY: number;
   flipY: boolean;
   defaultPartitionId: number | string;
+  /** Hide the map's tab until a partition for it exists (maps a server may not run yet). */
+  requiresPartition?: boolean;
 };
 
 export type LiveMapPartition = {

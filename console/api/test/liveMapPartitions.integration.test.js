@@ -51,6 +51,9 @@ test("real PostgreSQL: a freshly registered partition with zero actors still app
         -- active server id. It must remain selectable so saved map data can
         -- be inspected without pretending that the map is running.
         (61, '', 'DeepDesert_1', 1, 'PvE'),
+        -- Game update 1.6.0: DT_MapsInfo names Polar Sink "PolarCap_1" with
+        -- no separate friendly name, so the instance name passes through.
+        (70, 'polarcap-server-id', 'PolarCap_1', 0, 'Polar Sink'),
         -- Confirmed live: dungeon/story sub-instances carry a real,
         -- non-null server_id too (they are genuinely running server
         -- processes) -- a null-server_id check alone does not exclude
@@ -90,6 +93,10 @@ test("real PostgreSQL: a freshly registered partition with zero actors still app
     assert.equal(byPartitionId[61].map, "DeepDesert");
     assert.equal(byPartitionId[61].alive, false);
     assert.equal(byPartitionId[61].ready, false);
+
+    assert.ok(byPartitionId[70], "Polar Sink partition should be a Live Map partition");
+    assert.equal(byPartitionId[70].map, "PolarCap_1");
+    assert.equal(byPartitionId[70].name, "Polar Sink");
 
     assert.deepEqual(await liveMapPartitionRuntimeState(db, 1), { known: true, exists: true, alive: true, ready: true });
     assert.deepEqual(await liveMapPartitionRuntimeState(db, 61), { known: true, exists: true, alive: false, ready: false });

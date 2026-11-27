@@ -46,7 +46,11 @@ const RESOURCE_DISPLAY_NAMES = Object.freeze({
   Magnetite: "Iron",
   Rhyolite: "Granite",
   Stravidium: "Stravidium",
-  Titanium: "Titanium"
+  Titanium: "Titanium",
+  // Polar Sink (1.6.0) resource nodes carry no Ore/Pickup/Rock suffix.
+  GlacialIce: "Glacial Ice",
+  SalvagedPlastic: "Salvaged Plastic",
+  IrradiatedParts: "Irradiated Parts"
 });
 
 export function liveMapSubtypeLabel(category, subtype) {

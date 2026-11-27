@@ -61,7 +61,9 @@ export async function liveMapSpice(db, config, map = "", {
   // The archive remains available during lightweight refreshes so active
   // fields still use its ground-truth coordinates; only the static pool rows
   // themselves are omitted from those responses.
-  const archive = currentSeed && map !== "HaggaBasin" ? readSpiceArchive(config?.spiceLocationsFile) : null;
+  // The archive is Deep Desert data keyed by field id; on any other map a
+  // matching id would pin an active field to Deep Desert coordinates.
+  const archive = currentSeed && (!map || map === "DeepDesert") ? readSpiceArchive(config?.spiceLocationsFile) : null;
   const archiveFields = archive ? fieldsForSeed(archive, currentSeed) : null;
   const archiveByFieldId = new Map((archiveFields || []).map((field) => [String(field.field_id), field]));
 

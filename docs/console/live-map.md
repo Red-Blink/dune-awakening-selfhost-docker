@@ -2,7 +2,7 @@
 
 **Status:** Current | **Last Updated:** November 2026
 
-The Live Map panel renders Hagga Basin and The Deep Desert as pannable,
+The Live Map panel renders Hagga Basin, The Deep Desert and Polar Sink as pannable,
 zoomable square maps with real-time markers read directly from Postgres --
 players, vehicles, bases, storage, spice, resources, and points of interest.
 Nothing on this page polls the game server itself except the Coriolis seed
@@ -19,11 +19,48 @@ See [API-REFERENCE.md](API-REFERENCE.md#live-map) for the endpoint contract.
 
 ## Map and partition selection
 
-The two **Choose Map** buttons switch between Hagga Basin and The Deep
-Desert. Each map's config (world bounds, image, default partition) lives in
-`LIVE_MAP_CONFIGS` in `duneDb.js`.
+The **Choose Map** buttons switch between Hagga Basin, The Deep Desert and,
+once the server runs it, Polar Sink. Each map's config (world bounds, image,
+default partition) lives in `LIVE_MAP_CONFIGS` in `duneDb.js`. A config with
+`requiresPartition: true` only gets a button once `world_partition` has a
+partition for it, so a map can be configured before a game update ships it.
 
-The **Partition** dropdown lists every Hagga Basin and Deep Desert partition
+### Polar Sink (game update 1.6.0)
+
+Polar Sink's entry was built from the 1.6.0 test client, ahead of the server
+release:
+
+- **Image:** `polar-sink.webp` (4096 px) is stitched from the level's
+  landscape HLOD colour bakes, `T_LANDSCAPE_heightmap_x*_y*_LOD1_Packed_D`
+  (512 px per tile). The tiles form a 10x10 grid over +/-254,000 uu; tile
+  (x, y) sits at column x, row 9 - y, and the inner 8x8 is the map square.
+  Holes in the landscape (cave mouths, transparent and black in the bakes)
+  are filled from the surrounding ground and darkened. Relief is baked in as
+  hill shading from the level's landscape heightmaps (`heightmap_x*_y*`
+  sublevels; the first 512x512 BGRA8 block of each `.ubulk`, height in R/G),
+  lit from the north-west with 2x vertical exaggeration. On the ice cap the
+  shading is damped, because its cliffs are separate meshes sitting on rough
+  ground. Buildings and rocks are separate prop meshes and do not appear.
+- **Markers:** `DT_PolarCap_FullscreenMapMarkers` adds `PolarCave` and
+  `Dungeon` (POI's) and `GlacialIce`, `SalvagedPlastic` and `IrradiatedParts`
+  (Ores & Metals, matched by exact name since they have no Ore/Pickup/Rock
+  suffix). Their icons are the game's glyphs composed in the existing cave and
+  ore styles. `HeatSource` has no icon and no category.
+- **Bounds:** `DA_PolarCap_1_FullscreenMapData`: centre (0, 0), extents
+  +/-203,200 uu, with world Y increasing down the image as on Hagga Basin.
+  Checked by plotting the test client's 67 static map markers (read from
+  their sublevels): ice quarries land on the quarry roads and cave markers
+  on the cave mouths. A real player position on a 1.6.0 server is still the
+  final check.
+- **Map name:** `DT_MapsInfo` lists the map as `PolarCap_1` with no separate
+  friendly name, so both `world_partition.map` and `actors.map` are expected
+  to be `PolarCap_1`. This is unconfirmed until a 1.6.0 server is running;
+  if actors turn out to use another name, change `actorMap` and the
+  `polarcap_1` case in `liveMapPartitions`.
+- The Deep Desert spice archive is never applied to it (field ids are only
+  unique per map).
+
+The **Partition** dropdown lists every Hagga Basin, Deep Desert and Polar Sink partition
 known to `world_partition`, including a stopped dynamic partition whose active
 `server_id` has been released. Story and dungeon instances remain excluded by
 map type. A stopped partition is marked **Offline**, and the map explains that

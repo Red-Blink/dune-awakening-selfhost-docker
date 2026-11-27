@@ -79,7 +79,7 @@ const EXPANDABLE_KEYS = new Set(["spice", "spice_active", "ore", "scrap", "flora
 // The live map's own map identifiers ("HaggaBasin"/"DeepDesert") aren't the
 // instance names /api/maps/combat-state expects ("Survival_1"/"DeepDesert_1")
 // -- same translation liveMapPartitions() does server-side, in reverse.
-const LIVE_MAP_TO_COMBAT_STATE_MAP: Record<string, string> = { HaggaBasin: "Survival_1", DeepDesert: "DeepDesert_1" };
+const LIVE_MAP_TO_COMBAT_STATE_MAP: Record<string, string> = { HaggaBasin: "Survival_1", DeepDesert: "DeepDesert_1", PolarCap: "PolarCap_1" };
 const SPICE_TIER_TYPES = new Set(["spice", "spice_active"]);
 // These rows come from seed archives or the static world-marker atlas. They
 // are loaded on entry/map changes and refreshed periodically, but are kept
@@ -482,7 +482,9 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
     if (!activeMap) return undefined;
     return scheduleFitLiveMapView();
   }, [activeMap?.key]);
-  const mapOptions = Object.values(maps);
+  const mapOptions = Object.values(maps).filter((option) => !option.requiresPartition
+    || option.key === mapKey
+    || partitions.some((row) => row.map === (option.actorMap || option.key)));
   const partitionOptions = partitions.filter((row) => row.map === (activeMap?.actorMap || activeMap?.key));
   const activePartition = partitionOptions.find((row) => String(row.partition_id) === partitionId);
   const partitionRuntimeStatus = activePartition?.ready === true

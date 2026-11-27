@@ -3814,6 +3814,12 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-marker.subtype-azuritepickup:hover, .live-map-marker.subtype-basaltpickup:hover, .live-map-marker.subtype-bauxitepickup:hover, .live-map-marker.subtype-dolomitepickup:hover, .live-map-marker.subtype-erythritepickup:hover, .live-map-marker.subtype-jasmiumpickup:hover, .live-map-marker.subtype-magnetitepickup:hover, .live-map-marker.subtype-rhyolitepickup:hover, .live-map-marker.subtype-stravidiumpickup:hover, .live-map-marker.subtype-titaniumpickup:hover { width: 18px; height: 18px; }
 
 .live-map-marker.subtype-cave, .live-map-legend-dot.subtype-cave { background: url("/images/maps/cave.webp") center / contain no-repeat; }
+/* Polar Sink (1.6.0): game glyphs from DT_PolarCap_FullscreenMapMarkers, composed in the cave/ore styles. */
+.live-map-marker.subtype-polarcave, .live-map-legend-dot.subtype-polarcave { background: url("/images/maps/polarcave.webp") center / contain no-repeat; }
+.live-map-marker.subtype-dungeon, .live-map-legend-dot.subtype-dungeon { background: url("/images/maps/dungeon.webp") center / contain no-repeat; }
+.live-map-marker.subtype-glacialice, .live-map-legend-dot.subtype-glacialice { background: url("/images/maps/glacialice.webp") center / contain no-repeat; }
+.live-map-marker.subtype-salvagedplastic, .live-map-legend-dot.subtype-salvagedplastic { background: url("/images/maps/salvagedplastic.webp") center / contain no-repeat; }
+.live-map-marker.subtype-irradiatedparts, .live-map-legend-dot.subtype-irradiatedparts { background: url("/images/maps/irradiatedparts.webp") center / contain no-repeat; }
 .live-map-marker.subtype-sietch, .live-map-legend-dot.subtype-sietch { background: url("/images/maps/sietch.webp") center / contain no-repeat; }
 .live-map-marker.subtype-ecolab, .live-map-legend-dot.subtype-ecolab { background: url("/images/maps/ecolab.webp") center / contain no-repeat; }
 .live-map-marker.subtype-enemycamp, .live-map-legend-dot.subtype-enemycamp { background: url("/images/maps/enemycamp.webp") center / contain no-repeat; }

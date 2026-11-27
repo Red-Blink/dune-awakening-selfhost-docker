@@ -8338,7 +8338,7 @@
     "Auto-Refresh": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1068,
+        "line": 1070,
         "nearby": [
           "Live Map",
           "Live world markers, player teleport, partition filtering, zoom, pan, and coordinate selection.",
@@ -8586,7 +8586,7 @@
     "Awaiting Restart": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1100,
+        "line": 1102,
         "nearby": [
           "Coriolis Countdown",
           "Coriolis Seed",
@@ -10356,7 +10356,7 @@
     "Buggy": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1734,
+        "line": 1736,
         "nearby": [
           "Transport Ornithopter",
           "Sandbike",
@@ -10807,7 +10807,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1538,
+        "line": 1540,
         "nearby": [
           "Teleport destination player",
           "Confirm",
@@ -10817,7 +10817,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1614,
+        "line": 1616,
         "nearby": [
           "Teleport destination player",
           "Confirm",
@@ -12617,7 +12617,7 @@
     "Choose which layers -- and sub-types -- are on when the map first loads.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1129,
+        "line": 1131,
         "nearby": [
           "Default layer settings",
           "Default layers",
@@ -13138,7 +13138,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1521,
+        "line": 1523,
         "nearby": [
           "Picked location",
           "Picked Location",
@@ -13148,7 +13148,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1597,
+        "line": 1599,
         "nearby": [
           "Confirm",
           "Cancel",
@@ -13396,7 +13396,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1370,
+        "line": 1372,
         "nearby": [
           "Expand Player",
           "Player",
@@ -13405,7 +13405,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1420,
+        "line": 1422,
         "nearby": [
           "Expand",
           "Zoom In"
@@ -13559,7 +13559,7 @@
     "Collapse Player": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1331,
+        "line": 1333,
         "nearby": [
           "Terrain",
           "Elevation Lines",
@@ -14101,7 +14101,7 @@
     "Confirm": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1537,
+        "line": 1539,
         "nearby": [
           "Teleport",
           "Teleport destination player",
@@ -14111,7 +14111,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1613,
+        "line": 1615,
         "nearby": [
           "Open in Vehicles",
           "Teleport destination player",
@@ -15058,7 +15058,7 @@
     "Coriolis Countdown": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1094,
+        "line": 1096,
         "nearby": [
           "Coriolis Seed",
           "Terrain",
@@ -15069,7 +15069,7 @@
     "Coriolis Seed": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1090,
+        "line": 1092,
         "nearby": [
           "Zoom",
           "Partition Status",
@@ -15079,7 +15079,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1100,
+        "line": 1102,
         "nearby": [
           "Terrain",
           "Coriolis Countdown",
@@ -16544,7 +16544,7 @@
     "Default layer settings": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1124,
+        "line": 1126,
         "nearby": [
           "Searches player names and marker names, plus base and vehicle owners.",
           "Layers",
@@ -16556,7 +16556,7 @@
     "Default layers": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1128,
+        "line": 1130,
         "nearby": [
           "Layers",
           "Default layer settings",
@@ -17646,7 +17646,7 @@
     "Destination": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1008,
+        "line": 1010,
         "nearby": [
           "Teleport",
           "Player",
@@ -19067,7 +19067,7 @@
     "Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1450,
+        "line": 1452,
         "nearby": [
           "Tilt",
           "Top-Down",
@@ -19720,7 +19720,7 @@
     "Elevation Lines": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1274,
+        "line": 1276,
         "nearby": [
           "Overlay",
           "Sector Grid",
@@ -19729,7 +19729,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1277,
+        "line": 1279,
         "nearby": [
           "Terrain",
           "Collapse Player",
@@ -20383,14 +20383,14 @@
     "Error: No online players.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 985,
+        "line": 987,
         "nearby": [
           "Teleport Failed"
         ]
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 995,
+        "line": 997,
         "nearby": [
           "Teleport Failed",
           "Teleport Player",
@@ -20773,7 +20773,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1370,
+        "line": 1372,
         "nearby": [
           "Player",
           "Collapse"
@@ -20781,7 +20781,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1420,
+        "line": 1422,
         "nearby": [
           "Collapse",
           "Zoom In",
@@ -20956,7 +20956,7 @@
     "Expand Player": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1331,
+        "line": 1333,
         "nearby": [
           "Elevation Lines",
           "Collapse Player",
@@ -22311,7 +22311,7 @@
     "Fit Map": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1446,
+        "line": 1448,
         "nearby": [
           "Zoom In",
           "Zoom Out",
@@ -25382,7 +25382,7 @@
     "In Bounds": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1087,
+        "line": 1089,
         "nearby": [
           "Overview",
           "Visible",
@@ -27415,7 +27415,7 @@
     "Layers": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1123,
+        "line": 1125,
         "nearby": [
           "Clear",
           "Searches player names and marker names, plus base and vehicle owners.",
@@ -27580,7 +27580,7 @@
     "Light Ornithopter": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1730,
+        "line": 1732,
         "nearby": [
           "Marker technical details",
           "Loading map configuration...",
@@ -27768,7 +27768,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1067,
+        "line": 1069,
         "nearby": [
           "Teleport Sent",
           "Teleport Failed",
@@ -27839,7 +27839,7 @@
     "Live teleport is not supported by this database.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1022,
+        "line": 1024,
         "nearby": [
           "Teleport Sent",
           "Teleport Not Available",
@@ -27850,7 +27850,7 @@
     "Live world markers, player teleport, partition filtering, zoom, pan, and coordinate selection.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1067,
+        "line": 1069,
         "nearby": [
           "Teleport Failed",
           "Live Map",
@@ -28529,7 +28529,7 @@
     "Loading Map": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1491,
+        "line": 1493,
         "nearby": [
           "Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.",
           "Right-drag to tilt and rotate.",
@@ -28541,7 +28541,7 @@
     "Loading map configuration...": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1622,
+        "line": 1624,
         "nearby": [
           "Cancel",
           "Marker technical details",
@@ -29213,7 +29213,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 923,
+        "line": 925,
         "nearby": [
           "Player",
           "Status",
@@ -29551,7 +29551,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1075,
+        "line": 1077,
         "nearby": [
           "OFF",
           "Map View",
@@ -29751,7 +29751,7 @@
     "Map View": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1071,
+        "line": 1073,
         "nearby": [
           "ON",
           "OFF",
@@ -29872,7 +29872,7 @@
     "Marker technical details": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1617,
+        "line": 1619,
         "nearby": [
           "Confirm",
           "Cancel",
@@ -30116,7 +30116,7 @@
     "Medium Ornithopter": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1731,
+        "line": 1733,
         "nearby": [
           "Loading map configuration...",
           "Light Ornithopter",
@@ -32457,7 +32457,7 @@
     "No partitions available": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1080,
+        "line": 1082,
         "nearby": [
           "Map",
           "Partition",
@@ -33095,7 +33095,7 @@
     "none selected": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1527,
+        "line": 1529,
         "nearby": [
           "Close",
           "Partition",
@@ -33792,7 +33792,7 @@
     "offline": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1825,
+        "line": 1827,
         "nearby": [
           "Unknown",
           "online"
@@ -33833,7 +33833,7 @@
     "Offline teleport is not supported by this database.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 942,
+        "line": 944,
         "nearby": [
           "Teleport Sent",
           "Offline Teleport Not Available",
@@ -33845,7 +33845,7 @@
     "Offline Teleport Not Available": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 942,
+        "line": 944,
         "nearby": [
           "Teleporting Player",
           "Teleport Sent",
@@ -34074,7 +34074,7 @@
     "online": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1825,
+        "line": 1827,
         "nearby": [
           "Treadwheel",
           "Unknown",
@@ -34217,7 +34217,7 @@
     "Open in Bases": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1605,
+        "line": 1607,
         "nearby": [
           "Teleport is available only when an online player is already inside this running partition.",
           "Teleport",
@@ -34229,7 +34229,7 @@
     "Open in Vehicles": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1606,
+        "line": 1608,
         "nearby": [
           "Teleport",
           "Open in Bases",
@@ -34566,7 +34566,7 @@
     "Overlay": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1267,
+        "line": 1269,
         "nearby": [
           "Reset",
           "Sector Grid",
@@ -34652,7 +34652,7 @@
     "Overview": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1084,
+        "line": 1086,
         "nearby": [
           "No partitions available",
           "Partition",
@@ -35208,7 +35208,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1079,
+        "line": 1081,
         "nearby": [
           "Map View",
           "Map",
@@ -35217,7 +35217,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1080,
+        "line": 1082,
         "nearby": [
           "No partitions available",
           "Overview",
@@ -35226,7 +35226,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1527,
+        "line": 1529,
         "nearby": [
           "Picked Location",
           "Close",
@@ -35268,7 +35268,7 @@
     "Partition Status": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1089,
+        "line": 1091,
         "nearby": [
           "In Bounds",
           "Zoom",
@@ -35900,7 +35900,7 @@
     "Picked location": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1516,
+        "line": 1518,
         "nearby": [
           "Right-drag to tilt and rotate.",
           "Loading Map",
@@ -35912,7 +35912,7 @@
     "Picked Location": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1520,
+        "line": 1522,
         "nearby": [
           "Loading Map",
           "Picked location",
@@ -36454,7 +36454,7 @@
     "Player, owner, base, vehicle...": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1115,
+        "line": 1117,
         "nearby": [
           "This dynamic partition is offline. Terrain, resources, bases, and vehicles remain visible from saved data. Teleport becomes available after normal in-game travel starts the partition.",
           "Search Map",
@@ -40912,7 +40912,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1241,
+        "line": 1243,
         "nearby": [
           "Player",
           "Save as Default",
@@ -41094,7 +41094,7 @@
     "Respawn Location Saved": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 945,
+        "line": 947,
         "nearby": [
           "Offline Teleport Not Available",
           "Offline teleport is not supported by this database.",
@@ -42859,7 +42859,7 @@
     "Right-drag to tilt and rotate.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1450,
+        "line": 1452,
         "nearby": [
           "Top-Down",
           "Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.",
@@ -43547,7 +43547,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1733,
+        "line": 1735,
         "nearby": [
           "Medium Ornithopter",
           "Transport Ornithopter",
@@ -43569,7 +43569,7 @@
     "Sandcrawler": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1736,
+        "line": 1738,
         "nearby": [
           "Buggy",
           "Tank",
@@ -43802,7 +43802,7 @@
     "Save as Default": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1240,
+        "line": 1242,
         "nearby": [
           "Choose which layers -- and sub-types -- are on when the map first loads.",
           "Player",
@@ -44249,7 +44249,7 @@
     "Saved Map Data": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1103,
+        "line": 1105,
         "nearby": [
           "Coriolis Seed",
           "Awaiting Restart",
@@ -45428,7 +45428,7 @@
     "Search Map": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1113,
+        "line": 1115,
         "nearby": [
           "Saved Map Data",
           "This dynamic partition is offline. Terrain, resources, bases, and vehicles remain visible from saved data. Teleport becomes available after normal in-game travel starts the partition.",
@@ -45536,7 +45536,7 @@
     "Searches player names and marker names, plus base and vehicle owners.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1119,
+        "line": 1121,
         "nearby": [
           "Player, owner, base, vehicle...",
           "Clear",
@@ -45572,7 +45572,7 @@
     "Sector Grid": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1266,
+        "line": 1268,
         "nearby": [
           "Save as Default",
           "Reset",
@@ -45581,7 +45581,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1269,
+        "line": 1271,
         "nearby": [
           "Overlay",
           "Elevation Lines",
@@ -48790,7 +48790,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 922,
+        "line": 924,
         "nearby": [
           "Teleport",
           "Player",
@@ -49746,7 +49746,7 @@
     "Tank": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1735,
+        "line": 1737,
         "nearby": [
           "Sandbike",
           "Buggy",
@@ -49948,7 +49948,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 919,
+        "line": 921,
         "nearby": [
           "Teleport Failed",
           "This player marker does not include a usable admin player ID.",
@@ -49958,7 +49958,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1005,
+        "line": 1007,
         "nearby": [
           "Error: No online players.",
           "Teleport Player",
@@ -49968,7 +49968,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1530,
+        "line": 1532,
         "nearby": [
           "none selected",
           "Teleport is available only when an online player is already inside this running partition.",
@@ -49978,7 +49978,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1604,
+        "line": 1606,
         "nearby": [
           "Close",
           "Teleport is available only when an online player is already inside this running partition.",
@@ -50022,7 +50022,7 @@
     "Teleport destination player": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1533,
+        "line": 1535,
         "nearby": [
           "Teleport is available only when an online player is already inside this running partition.",
           "Teleport",
@@ -50032,7 +50032,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1609,
+        "line": 1611,
         "nearby": [
           "Open in Bases",
           "Open in Vehicles",
@@ -50056,7 +50056,7 @@
     "Teleport Failed": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 912,
+        "line": 914,
         "nearby": [
           "Ornithopter",
           "Technical details",
@@ -50066,7 +50066,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 956,
+        "line": 958,
         "nearby": [
           "Offline teleport is not supported by this database.",
           "Respawn Location Saved",
@@ -50075,7 +50075,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 985,
+        "line": 987,
         "nearby": [
           "Respawn Location Saved",
           "Error: No online players."
@@ -50083,7 +50083,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 995,
+        "line": 997,
         "nearby": [
           "Error: No online players.",
           "Teleport Player"
@@ -50091,7 +50091,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1031,
+        "line": 1033,
         "nearby": [
           "Live teleport is not supported by this database.",
           "Teleport Sent",
@@ -50115,7 +50115,7 @@
     "Teleport is available only when an online player is already inside this running partition.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1530,
+        "line": 1532,
         "nearby": [
           "Partition",
           "none selected",
@@ -50125,7 +50125,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1604,
+        "line": 1606,
         "nearby": [
           "Cancel",
           "Close",
@@ -50137,7 +50137,7 @@
     "Teleport Not Available": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1022,
+        "line": 1024,
         "nearby": [
           "Teleporting Player",
           "Teleport Sent",
@@ -50158,7 +50158,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1004,
+        "line": 1006,
         "nearby": [
           "Teleport Failed",
           "Error: No online players.",
@@ -50179,7 +50179,7 @@
     "Teleport Sent": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 938,
+        "line": 940,
         "nearby": [
           "Location",
           "Teleporting Player",
@@ -50189,7 +50189,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1020,
+        "line": 1022,
         "nearby": [
           "Destination",
           "Teleporting Player",
@@ -50199,7 +50199,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1025,
+        "line": 1027,
         "nearby": [
           "Teleport Not Available",
           "Live teleport is not supported by this database.",
@@ -50259,7 +50259,7 @@
     "Teleporting Player": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 931,
+        "line": 933,
         "nearby": [
           "Status",
           "Location",
@@ -50269,7 +50269,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1013,
+        "line": 1015,
         "nearby": [
           "Player",
           "Destination",
@@ -50349,7 +50349,7 @@
     "Terrain": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1091,
+        "line": 1093,
         "nearby": [
           "Partition Status",
           "Coriolis Seed",
@@ -50358,7 +50358,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1275,
+        "line": 1277,
         "nearby": [
           "Sector Grid",
           "Elevation Lines",
@@ -51798,7 +51798,7 @@
     "This dynamic partition is offline. Terrain, resources, bases, and vehicles remain visible from saved data. Teleport becomes available after normal in-game travel starts the partition.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1104,
+        "line": 1106,
         "nearby": [
           "Awaiting Restart",
           "Saved Map Data",
@@ -52038,7 +52038,7 @@
     "This player marker does not include a usable admin player ID.": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 912,
+        "line": 914,
         "nearby": [
           "Technical details",
           "Teleport Failed",
@@ -52211,7 +52211,7 @@
     "Tilt": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1448,
+        "line": 1450,
         "nearby": [
           "Fit Map",
           "Zoom",
@@ -52497,7 +52497,7 @@
     "Top-Down": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1449,
+        "line": 1451,
         "nearby": [
           "Zoom",
           "Tilt",
@@ -52790,7 +52790,7 @@
     "Transport Ornithopter": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1732,
+        "line": 1734,
         "nearby": [
           "Light Ornithopter",
           "Medium Ornithopter",
@@ -52824,7 +52824,7 @@
     "Treadwheel": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1737,
+        "line": 1739,
         "nearby": [
           "Tank",
           "Sandcrawler",
@@ -55300,7 +55300,7 @@
     "Visible": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1086,
+        "line": 1088,
         "nearby": [
           "Partition",
           "Overview",
@@ -56306,7 +56306,7 @@
     "Zoom": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1088,
+        "line": 1090,
         "nearby": [
           "Visible",
           "In Bounds",
@@ -56316,7 +56316,7 @@
       },
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1447,
+        "line": 1449,
         "nearby": [
           "Zoom Out",
           "Fit Map",
@@ -56328,7 +56328,7 @@
     "Zoom In": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1444,
+        "line": 1446,
         "nearby": [
           "Collapse",
           "Expand",
@@ -56340,7 +56340,7 @@
     "Zoom Out": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
-        "line": 1445,
+        "line": 1447,
         "nearby": [
           "Expand",
           "Zoom In",
