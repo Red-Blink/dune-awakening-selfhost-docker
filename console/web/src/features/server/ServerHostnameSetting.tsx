@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { useConsoleAccess } from "../../lib/consoleAccess";
 import { setupApi } from "../../api/setup";
 import { validDatacenterId } from "../../components/SetupWizard";
 import { InfoTooltip } from "../../components/common/DisplayPrimitives";
 export function useServerHostname() {
+  const access = useConsoleAccess();
   const [value, setValue] = useState("");
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   async function load() {
+    if (!access.can("setup:read")) return;
     setError("");
     try {
       const { serverConfig = {} } = await setupApi.state();
@@ -14,7 +17,7 @@ export function useServerHostname() {
       setValue(next); setSaved(next);
     } catch { setError("Could not load the hostname."); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [access]);
   const valid = validDatacenterId(value.trim());
   return { value, setValue, error, load, ready: Boolean(saved), valid, changed: value.trim() !== saved,
     async save() {

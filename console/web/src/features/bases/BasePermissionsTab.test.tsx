@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { basesApi, type BasePermissionEntry, type BasePermissionRank } from "../../api/bases";
 import { BasePermissionsTab } from "./BasePermissionsTab";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 
 vi.mock("../../api/bases", () => ({
   basesApi: {
@@ -64,6 +65,18 @@ beforeEach(() => {
 });
 
 describe("BasePermissionsTab layout", () => {
+  it("shows the roster without ownership or editing controls for a read-only account", async () => {
+    setConsoleAccess("ready", { username: "reader", displayName: "Reader", tier: "moderator" }, ["bases:read"]);
+    mockRoster(DEFAULT_ROSTER, { available: true, playerId: "99", name: "Custodian" });
+    renderTab();
+    await screen.findByText("DarkShark", { selector: ".bases-permissions-owner-name" });
+    expect(screen.getByText("Yaida")).toBeVisible();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.queryByPlaceholderText("Search a player to add")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Remove|Transfer|Save changes|Revert/i })).toBeNull();
+    expect(basesApi.setPermissions).not.toHaveBeenCalled();
+  });
+
   it("puts the Owner in the hero card and everyone else in the roster", async () => {
     mockRoster(DEFAULT_ROSTER);
     renderTab();

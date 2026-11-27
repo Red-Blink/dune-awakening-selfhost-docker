@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useState } from "react";
 import { InlineActionResult, type InlineActionResultState } from "../../components/common/InlineActionResult";
 import { post } from "../../api/client";
@@ -37,7 +38,7 @@ export function ConsoleAccessNotice({ status, confirmAction, onConfirmed }: Prop
         : "Your existing IP setting was not active before this update. Console access has been preserved until you confirm it."}</p>
       {!status.canConfirm && <p className="muted">Activation is blocked because these restrictions would exclude your current connection or contain an invalid address. Correct the setting using SSH first.</p>}
       <div className="action-row">
-        <button disabled={busy || !status.canConfirm} onClick={() => { void confirm(); }}>{busy ? "Activating..." : "Review And Activate"}</button>
+        <PermissionGate action="settings:write"><button disabled={busy || !status.canConfirm} onClick={() => { void confirm(); }}>{busy ? "Activating..." : "Review And Activate"}</button></PermissionGate>
         <InlineActionResult result={result} resultKey="access" />
       </div>
       <details><summary>SSH Recovery</summary><p className="muted">{status.recovery}</p></details>

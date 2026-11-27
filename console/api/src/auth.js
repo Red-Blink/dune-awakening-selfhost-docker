@@ -34,10 +34,35 @@ export function parseCookies(header = "") {
 export function createAuth(config) {
   const sessions = new Map();
   const now = config.now || (() => Date.now());
+
+  // Finding #1355: a Discord-derived session (userId set) carries a tier that was
+  // resolved ONCE at sign-in, and the idle expiry slides on every request, so a
+  // role removed or a member who left the guild would keep that tier forever. An
+  // ABSOLUTE expiry (never extended by activity) bounds that lag: after it, the
+  // user signs in again and the roles are re-resolved from Discord. 0 disables it.
+  const DISCORD_SESSION_MAX_AGE_MS = Math.max(0, Number(config.discordSessionMaxAgeMs ?? 60 * 60 * 1000) || 0);
+  function absoluteExpiryFor(userId, scope) {
+    return userId && !scope && DISCORD_SESSION_MAX_AGE_MS > 0 ? now() + DISCORD_SESSION_MAX_AGE_MS : null;
+  }
+  const pastAbsoluteExpiry = (session) => Number.isFinite(session.absoluteExpiresAt) && session.absoluteExpiresAt < now();
   const sessionStoreFile = config.sessionStoreFile ? String(config.sessionStoreFile) : "";
   let lastPersistAt = 0;
   let persistenceCredential, persistenceSecret, persistenceKey;
 
+  // Integrity tag over an opaque session id -- NOT password storage.
+  //
+  // CodeQL flags this as js/insufficient-password-hash, which fires when a
+  // credential is hashed with a fast hash instead of a slow KDF. There is no
+  // password here and no stored digest for anyone to crack: `value` is a
+  // server-generated random id, `config.sessionSecret` is an HMAC KEY, and the
+  // output authenticates the cookie rather than standing in for a secret. A KDF
+  // would be the wrong primitive -- it is not a verifier for a low-entropy,
+  // human-chosen input.
+  //
+  // The id's unguessability comes from randomBytes(32), and the server-side
+  // store is the real authority regardless of the signature -- both proven in
+  // test/sessionFixation.test.js.
+  // codeql[js/insufficient-password-hash]
   function sign(value) {
     return createHmac("sha256", config.sessionSecret).update(value).digest("base64url");
   }
@@ -51,7 +76,7 @@ export function createAuth(config) {
       persistenceCredential = config.adminPassword;
       persistenceSecret = config.sessionSecret;
     }
-    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged)])).digest("base64url");
+    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged), ...(entry.displayName ? [String(entry.displayName)] : []), ...(entry.absoluteExpiresAt ? ["abs", Number(entry.absoluteExpiresAt)] : [])])).digest("base64url");
   }
 
   function constantTimeStringEqual(left, right) {
@@ -72,6 +97,11 @@ export function createAuth(config) {
         const expiresAt = Number(entry.expiresAt);
         if (!Number.isFinite(expiresAt) || expiresAt < currentNow) continue;
         if (!entry.mac || !constantTimeStringEqual(sessionMac(entry), entry.mac)) continue;
+        // A Discord-derived session written before the absolute cap existed has no
+        // cap to enforce: drop it so the user re-signs in once and gets one (#1355).
+        const absoluteExpiresAt = Number(entry.absoluteExpiresAt);
+        if (entry.userId && DISCORD_SESSION_MAX_AGE_MS > 0 && !Number.isFinite(absoluteExpiresAt)) continue;
+        if (Number.isFinite(absoluteExpiresAt) && absoluteExpiresAt < currentNow) continue;
         sessions.set(entry.id, {
           id: entry.id,
           csrf: entry.csrf,
@@ -79,7 +109,9 @@ export function createAuth(config) {
           tier: entry.tier || "owner",
           userId: entry.userId || "",
           username: entry.username || "",
-          guildId: entry.guildId || ""
+          displayName: entry.displayName || entry.username || "",
+          guildId: entry.guildId || "",
+          ...(Number.isFinite(absoluteExpiresAt) ? { absoluteExpiresAt } : {})
         });
       }
     } catch {
@@ -95,10 +127,14 @@ export function createAuth(config) {
     try {
       const active = [];
       for (const [id, session] of sessions) {
-        if (!session || session.expiresAt < currentNow) {
+        if (!session || session.expiresAt < currentNow || pastAbsoluteExpiry(session)) {
           sessions.delete(id);
           continue;
         }
+        // Enrollment / resetup sessions (scope set) are short-lived, non-renewable and
+        // memory-only: restoring one after a restart without its scope would hand back
+        // a full session, so they are never written to the store.
+        if (session.scope || session.renewable === false) continue;
         active.push({
           id: session.id,
           csrf: session.csrf,
@@ -106,7 +142,9 @@ export function createAuth(config) {
           tier: session.tier || "owner",
           userId: session.userId || "",
           username: session.username || "",
+          ...(session.displayName ? { displayName: session.displayName } : {}),
           guildId: session.guildId || "",
+          ...(session.absoluteExpiresAt ? { absoluteExpiresAt: session.absoluteExpiresAt } : {}),
           mac: sessionMac(session)
         });
       }
@@ -118,30 +156,71 @@ export function createAuth(config) {
 
   loadPersistedSessions();
 
-  function makeSession({ tier = "owner", userId = "", username = "", guildId = "" } = {}) {
+  const DEFAULT_TTL_MS = SESSION_TTL_MS;
+
+  // scope: null for a normal session; "enroll" for the short-lived, non-renewable
+  // second-factor enrollment session (RFC §4) that the route gate restricts to
+  // the enrollment endpoints only. renewable:false keeps the enrollment window
+  // fixed so it can't be extended by activity.
+  // expectedFactorVersion: only set on a recovery-login resetup session
+  // (scope:"resetup") -- the second-factor store's factorVersion (see
+  // secondFactorStore.js) as of the recovery code that minted this session,
+  // re-checked by commit() at confirm time so a stale/concurrent resetup
+  // session can't overwrite an authenticator a different session already
+  // replaced (review finding, upstream PR #201, 2026-09-06).
+  function makeSession({ tier = "owner", userId = "", username = "", displayName = "", guildId = "", scope = null, ttlMs = DEFAULT_TTL_MS, renewable = true, expectedFactorVersion = null } = {}) {
     const id = randomBytes(32).toString("base64url");
     const csrf = randomBytes(24).toString("base64url");
-    const expiresAt = now() + SESSION_TTL_MS;
-    const session = { id, csrf, expiresAt, tier, userId, username, guildId };
+    const expiresAt = now() + ttlMs;
+    const absoluteExpiresAt = absoluteExpiryFor(userId, scope);
+    const session = { id, csrf, expiresAt, tier, userId, username, displayName, guildId, scope, renewable, expectedFactorVersion, ...(absoluteExpiresAt ? { absoluteExpiresAt } : {}) };
     sessions.set(id, session);
-    persistSessions(true);
+    if (!scope) persistSessions(true);
     return { ...session, cookie: `${id}.${sign(id)}` };
   }
 
   function readSession(req) {
-    if (config.authDisabled) return { id: "dev", csrf: "dev", expiresAt: Number.MAX_SAFE_INTEGER, tier: "owner" };
+    if (config.authDisabled) return { id: "dev", csrf: "dev", expiresAt: Number.MAX_SAFE_INTEGER, tier: "owner", scope: null, renewable: true };
     const raw = parseCookies(req.headers.cookie || "").get("asc_session");
     if (!raw) return null;
     const [id, sig] = raw.split(".");
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
-    if (!session || session.expiresAt < now()) {
+    if (!session || session.expiresAt < now() || pastAbsoluteExpiry(session)) {
       if (sessions.delete(id)) persistSessions(true);
       return null;
     }
-    session.expiresAt = now() + SESSION_TTL_MS;
-    persistSessions(false);
+    if (session.renewable !== false) session.expiresAt = now() + DEFAULT_TTL_MS;
+    if (!session.scope) persistSessions(false);
     return session;
+  }
+
+  // Server-side lookup by session id, for a flow that must hand data back to
+  // a specific live session it did not receive a cookie for (the Discord setup
+  // callback). Expiry is honored exactly as readSession does.
+  function readSessionById(id) {
+    const session = sessions.get(id);
+    if (!session || session.expiresAt < now() || pastAbsoluteExpiry(session)) return null;
+    return session;
+  }
+
+  // #1355 live re-validation support. Copies only: callers never receive the live object.
+  function listSessions() {
+    const out = [];
+    for (const session of sessions.values()) {
+      if (session.expiresAt < now() || pastAbsoluteExpiry(session)) continue; // dead entries are pruned lazily; never re-check them
+      out.push({ id: session.id, userId: session.userId || "", tier: session.tier, scope: session.scope || null });
+    }
+    return out;
+  }
+
+  // Changes the tier of a live session in place (a role was added or removed in Discord).
+  function setSessionTier(id, tier) {
+    const session = sessions.get(id);
+    if (!session || session.tier === tier) return false;
+    session.tier = tier;
+    if (!session.scope) persistSessions(true);
+    return true;
   }
 
   function revokeSession(req) {
@@ -161,9 +240,92 @@ export function createAuth(config) {
     const [id, sig] = raw.split(".");
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
-    return session && session.expiresAt >= now() ? session : null;
+    return session && session.expiresAt >= now() && !pastAbsoluteExpiry(session) ? session : null;
   }
 
+  // Invalidate one session by id (enrollment completion, logout, rotation).
+  function invalidateSession(id) {
+    const session = sessions.get(id);
+    const removed = sessions.delete(id);
+    // Ordinary sessions are persisted, so removing one must reach the store too.
+    if (removed && session && !session.scope) persistSessions(true);
+    return removed;
+  }
+
+  // Invalidate every OTHER password/TOTP-authenticated session (RFC §2.3/§5:
+  // credential rotation clears sessions of the rotated credential type only).
+  // Discord- (and future passkey-) authenticated sessions always carry a
+  // non-empty userId and are left untouched; this fork has not yet adopted
+  // upstream's explicit `local-owner` principal for the password/TOTP tier
+  // (deferred, meta), so an empty userId is what currently marks
+  // this credential type.
+  //
+  // `session.scope` must ALSO be excluded (review finding, upstream PR #201,
+  // 2026-09-08): an enroll/resetup-scope session (RFC §4) carries no userId
+  // either -- the same marker a normal password/TOTP session uses -- so
+  // without this check, calling this from inside the 2FA confirm route to
+  // fix the finding above would kill a DIFFERENT, still-legitimate concurrent
+  // enrollment session's cookie before it ever gets to make its own request,
+  // turning its expected 409 (already_configured) into an opaque 403
+  // (session/CSRF invalid). Caught by the existing
+  // "a second enrollment that loses the race gets 409" test going red on the
+  // very first version of that fix. Returns the number of sessions
+  // invalidated.
+  // Discord sign-in was disabled or forgotten: every Discord-derived session ends with it.
+  function invalidateDiscordSessions() {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (!session.userId || session.scope) continue;
+      sessions.delete(id);
+      count++;
+    }
+    if (count) persistSessions(true);
+    return count;
+  }
+
+  function invalidatePasswordSessions(exceptId) {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (id === exceptId || session.userId || session.scope) continue;
+      sessions.delete(id);
+      count++;
+    }
+    // These are ordinary (scope-less) sessions, which are persisted.
+    if (count) persistSessions(true);
+    return count;
+  }
+
+  // Invalidate every OTHER outstanding recovery (resetup-scope) session --
+  // called when one resetup session successfully replaces the authenticator
+  // (review finding, upstream PR #201, 2026-09-06). commit()'s
+  // expectedFactorVersion check already stops a stale sibling from
+  // overwriting the newly-committed factor; this additionally ends the
+  // sibling's session outright so returning to it surfaces an immediate,
+  // unambiguous "your session expired, sign in again" via the normal
+  // readSession() expiry path, rather than a confusing generation-mismatch
+  // error at the very end of a full re-enrollment flow. Returns the number of
+  // sessions invalidated.
+  function invalidateResetupSessions(exceptId) {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (id === exceptId || session.scope !== "resetup") continue;
+      sessions.delete(id);
+      count++;
+    }
+    if (count) persistSessions(true);
+    return count;
+  }
+
+  // Merged during the 2026-09-21 upstream rebase: upstream/main independently
+  // added scrypt-file-password support (async, verifyPassword()) while this
+  // fork's tier3-upstream branch was in flight -- kept async and delegating
+  // to verifyPassword()/constantTimeStringEqual() (upstream's newer, more
+  // capable implementation, understands both the legacy plaintext and the
+  // newer scrypt on-disk password formats) rather than reverting to the
+  // simpler timingSafeEqual-only version this branch had, which would have
+  // been a real regression for any operator already on a scrypt-hashed
+  // password file. See server.js's own merge for the matching await-site
+  // fixes this made necessary.
   async function passwordMatches(value) {
     // ADMIN_PASSWORD is an operator-supplied literal. Password files may be
     // either the legacy plaintext format or the scrypt format written by a
@@ -188,12 +350,12 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, revokeSession, peekSession, passwordMatches, requireAuth };
+  return { makeSession, readSession, readSessionById, revokeSession, peekSession, listSessions, setSessionTier, invalidateDiscordSessions, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
-export function setSessionCookie(res, session, config = {}) {
+export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {
   const secure = config.secureCookies ? "; Secure" : "";
-  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secure}`);
+  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAgeSeconds}${secure}`);
 }
 
 export function clearSessionCookie(res, config = {}) {

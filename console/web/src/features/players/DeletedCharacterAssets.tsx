@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useConsoleAccess } from "../../lib/consoleAccess";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { playersApi, type DeletedCharacterAsset, type DeletedCharacterAssetsResult, type DeletedCharacterEntry } from "../../api/players";
 import { vehiclesApi } from "../../api/vehicles";
@@ -84,6 +85,8 @@ type AssetTableProps = {
 };
 
 function AssetTable({ title, assets, emptyMessage, columns, columnLabels, onOpen, onDelete, deletingId = "", queuedDeleteIds = new Set(), instanceNames }: AssetTableProps) {
+  const access = useConsoleAccess();
+  if (!access.can(title === "Bases" ? "bases:read" : "vehicles:read")) return null;
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   return (
     <div className="deleted-character-assets-group">
@@ -97,7 +100,7 @@ function AssetTable({ title, assets, emptyMessage, columns, columnLabels, onOpen
         rowKey={(row) => String(row.id)}
         emptyMessage={emptyMessage}
         actionClassName="actions-column deleted-character-asset-actions"
-        action={onDelete ? (row) => {
+        action={onDelete && access.can("vehicles:delete") ? (row) => {
           const asset = assetsById.get(String(row.id));
           if (!asset) return null;
           const label = asset.name || `vehicle ${asset.id}`;
@@ -125,6 +128,7 @@ type DeletedCharacterAssetsProps = {
 };
 
 export function DeletedCharacterAssets({ onOpenBase, onError, confirmAction }: DeletedCharacterAssetsProps) {
+  const access = useConsoleAccess();
   const [result, setResult] = useState<DeletedCharacterAssetsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [supported, setSupported] = useState(true);
@@ -168,6 +172,7 @@ export function DeletedCharacterAssets({ onOpenBase, onError, confirmAction }: D
 
   useEffect(() => {
     let cancelled = false;
+    if (!access.can("vehicles:read")) return;
     void vehiclesApi.pendingDeletes().then((pending) => {
       if (!cancelled && pending.supported) {
         setQueuedDeleteIds((current) => new Set([
@@ -180,7 +185,7 @@ export function DeletedCharacterAssets({ onOpenBase, onError, confirmAction }: D
       // authority and will safely deduplicate an already queued request.
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [access]);
 
   const characters = result?.characters || [];
   const totals = result?.totals;

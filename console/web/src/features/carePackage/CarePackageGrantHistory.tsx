@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { formatAbsoluteDateTime } from "../../lib/display";
+import { PermissionGate } from "../../lib/consoleAccess";
 
 type Grant = Record<string, unknown>;
 type Props = {
@@ -93,7 +94,7 @@ function GrantDetails({ row, describeAction, actionError, onRetry, onClose }: Om
       {!results.length && Boolean(row.reason) && <p className="grant-outcome-failure">{String(row.reason)}</p>}
       <div className="confirm-modal-actions">
         <button className="secondary" onClick={onClose}>Close</button>
-        {String(row.status || "").toLowerCase() === "failed" && <button onClick={() => { onClose(); onRetry(row); }}>Retry</button>}
+        {String(row.status || "").toLowerCase() === "failed" && <PermissionGate action="carepackage:grant"><button onClick={() => { onClose(); onRetry(row); }}>Retry</button></PermissionGate>}
       </div>
     </section>
   </div>, document.body);

@@ -38,7 +38,7 @@ but the bot wasn't there to answer it.
 
 **How to fix:**
 1. Check your role in the server
-2. Ask your server admin to add your role ID to `DISCORD_OBSERVER_ROLE_IDS`,
+2. Ask your server admin to add your role ID to `DISCORD_PLAYER_ROLE_IDS`,
    `DISCORD_MODERATOR_ROLE_IDS` or `DISCORD_ADMIN_ROLE_IDS` in both the bot's and
    the console's `.env` (population, maps and player commands need Moderator)
 3. The bot needs to be restarted after changing its `.env`, and the console
@@ -191,7 +191,7 @@ Common causes:
 
 **How to fix:**
 Either:
-1. Add role IDs to `DISCORD_OBSERVER_ROLE_IDS` or `DISCORD_ADMIN_ROLE_IDS`
+1. Add role IDs to `DISCORD_PLAYER_ROLE_IDS` or `DISCORD_ADMIN_ROLE_IDS`
 2. Or temporarily set `DISCORD_RBAC_MODE=open` for testing
 
 ---

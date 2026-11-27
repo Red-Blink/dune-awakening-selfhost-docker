@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
@@ -298,7 +299,7 @@ export function PlayerSummary({
                 {row.estimated_rank !== undefined && <span><strong>{row.estimated_rank}</strong> Est. Rank</span>}
                 {row.rank_limited_by_progression && row.current_rank_limit !== null && row.current_rank_limit !== undefined
                   && <span><strong>{row.current_rank_limit}</strong> Story Limit</span>}
-                {(row.reputation_in_sync === false || row.progression_repair_available) && onRepairFactionReputation && <span className="summary-faction-repair-action">
+                {(row.reputation_in_sync === false || row.progression_repair_available) && onRepairFactionReputation && <PermissionGate action="players:repair"><span className="summary-faction-repair-action">
                   <button
                     type="button"
                     className="summary-faction-repair-button"
@@ -306,7 +307,7 @@ export function PlayerSummary({
                     title={factionRepairDisabled ? "The player must be fully offline before their faction state can be repaired." : "Restore earned faction progression and synchronize reputation."}
                     onClick={() => void onRepairFactionReputation()}
                   >{factionRepairResult?.pending ? "Repairing…" : factionRepairDisabled ? "Player Must Be Offline" : "Repair Faction"}</button>
-                </span>}
+                </span></PermissionGate>}
               </span></td>
             </tr>)}
           </tbody></table>

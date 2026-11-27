@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutGrid, List, Trash2, X } from "lucide-react";
 import { CatalogItemThumb } from "../../components/common/ItemCatalog";
@@ -38,6 +39,7 @@ function errorText(error: unknown) {
 // deliberate click on an already-visible item, while the bulk controls sit
 // behind a confirm-gated toggle.
 export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirmAction, onError }: VehicleStorageOverlayProps) {
+  const access = useConsoleAccess();
   const [storage, setStorage] = useState<VehicleStorage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -124,7 +126,7 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
   const itemCount = slots.reduce((total, slot) => total + slot.quantity, 0);
 
   const deleteAllowed = found && storage?.deleteSafety?.safe === true;
-  const bulkDeleteAllowed = deleteAllowed && destructiveControlsVisible;
+  const bulkDeleteAllowed = access.can("vehicles:bulk-delete-items") && deleteAllowed && destructiveControlsVisible;
   const deleteUnavailableReason = found && !deleteAllowed
     ? storage?.deleteSafety?.reason || "Cargo deletion is unavailable for this vehicle."
     : "";
@@ -435,20 +437,20 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
                     {slot.positionIndex === null ? "—" : `#${slot.positionIndex}`}
                   </span>
                   <span className="bases-inventory-contents-qty">{slot.quantity.toLocaleString()}</span>
-                  <button
+                  <PermissionGate action="vehicles:delete-item"><button
                     className="icon-toggle-button danger"
                     title="Delete this stack"
                     aria-label={`Delete ${slot.name} from slot ${slot.positionIndex ?? "unknown"}`}
                     disabled={!deleteAllowed || deletingItemId === slot.itemId}
                     onClick={() => void deleteSlot(slot, slot.quantity)}
-                  ><Trash2 size={15} /></button>
+                  ><Trash2 size={15} /></button></PermissionGate>
                 </div>
               ))}
             </div>}
           </div>
         </div>}
 
-        {found && slots.length > 0 && <label
+        {found && slots.length > 0 && <PermissionGate action="vehicles:bulk-delete-items"><label
           className={`switch-checkbox bases-inventory-givefill-toggle ${destructiveControlsVisible ? "enabled" : "disabled"}`}
         >
           {/* Rendered even when deletion is unavailable -- visible but
@@ -462,19 +464,19 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
           />
           <span className="switch-label">Bulk Delete Controls</span>
           <strong className="switch-state">{destructiveControlsVisible ? "ON" : "OFF"}</strong>
-        </label>}
+        </label></PermissionGate>}
 
         {bulkDeleteAllowed && slots.length > 0 && <div className="bases-inventory-bulk-actions">
-          <button
+          <PermissionGate action="vehicles:bulk-delete-items"><button
             className="danger"
             disabled={checkedItemIds.size === 0 || bulkDeleteRunning}
             onClick={() => void deleteCheckedItems()}
-          >{bulkDeleteRunning ? "Deleting…" : `Delete Selected (${checkedItemIds.size})`}</button>
-          <button
+          >{bulkDeleteRunning ? "Deleting…" : `Delete Selected (${checkedItemIds.size})`}</button></PermissionGate>
+          <PermissionGate action="vehicles:bulk-delete-items"><button
             className="danger"
             disabled={bulkDeleteRunning}
             onClick={() => void deleteAllItems()}
-          >{bulkDeleteRunning ? "Deleting…" : "Delete All"}</button>
+          >{bulkDeleteRunning ? "Deleting…" : "Delete All"}</button></PermissionGate>
         </div>}
 
         {selectedSlot && <div className="bases-inventory-slot-detail">
@@ -506,11 +508,11 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
               onChange={(event) => setAmount(event.target.value)}
             />
           </label>
-          <button
+          <PermissionGate action="vehicles:delete-item"><button
             className="danger"
             disabled={!deleteAllowed || !amountValid || deletingItemId === selectedSlot.itemId}
             onClick={() => void deleteSlot(selectedSlot, amountNumber)}
-          >{amountNumber >= selectedSlot.quantity ? "Delete Stack" : `Remove ${amountNumber.toLocaleString()}`}</button>
+          >{amountNumber >= selectedSlot.quantity ? "Delete Stack" : `Remove ${amountNumber.toLocaleString()}`}</button></PermissionGate>
         </div>}
 
         {selectedSlot && !amountValid && <p className="bases-inventory-amount-error" role="alert">
