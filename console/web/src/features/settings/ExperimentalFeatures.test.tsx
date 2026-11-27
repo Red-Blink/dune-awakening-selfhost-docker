@@ -142,7 +142,7 @@ test("keeps the experimental explanation behind the standard info icon", async (
   expect(help).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(help);
   expect(help).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Disable before updating the game server");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("the update pauses before shutdown");
 });
 
 test("enabled cards have a green-state class and offer disabling even on unsupported builds", async () => {

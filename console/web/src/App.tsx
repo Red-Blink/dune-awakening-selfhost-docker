@@ -1,5 +1,5 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
+import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, LayoutDashboard, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
 import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, loginRequest, post, setCsrfToken } from "./api/client";
 import { TotpSetupScreen } from "./features/auth/TotpSetupScreen";
 import { setServerPorts, setAdminPort, type ServerPorts } from "./api/serverPorts";
@@ -13,6 +13,10 @@ import { TaskProgress } from "./components/TaskProgress";
 import { ConfirmDialog, type ConfirmDialogDetail, type ConfirmDialogOutcome, type ConfirmDialogRequest } from "./components/common/ConfirmDialog";
 import { LazyTabBoundary } from "./components/common/LazyTabBoundary";
 import { ThemeLauncher } from "./themes/ThemeLauncher";
+import { SkinStudioLauncher } from "./skins/SkinStudioLauncher";
+import { CustomDashboardView } from "./skins/CustomDashboardView";
+import { CrossPageWidgetRendererContext } from "./skins/LayoutZone";
+import { useSkinConfig } from "./skins/useSkinConfig";
 import type { RestartGateChoice } from "./features/server/restartQueueGuard";
 import { loadPinnedAddons, savePinnedAddons, type PinnedAddon } from "./features/addons/pinnedAddons";
 import { hasAddonUpdates } from "./features/addons/addonVersions";
@@ -372,6 +376,9 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
 // check against this, not ALL_TABS -- landing on a tab
 // with no highlighted nav item and no way back reads as a broken jump.
 export const NAV_TABS: readonly Tab[] = navGroups.flatMap((group) => group.items.map((item) => item.tab));
+const NAV_ICON_BY_TAB = new Map<Tab, React.ReactNode>(
+  navGroups.flatMap((group) => group.items.map((item) => [item.tab, item.icon] as const))
+);
 
 // One tick of the poll that decides when a start, stop or restart has finished.
 // Always fresh: a cached snapshot from mid-stop can end the action early. It
@@ -457,6 +464,7 @@ function AppFooter() {
 }
 
 export function App() {
+  const [skin] = useSkinConfig();
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
   // Tier 3 second factor (RFC §2.3/§4). All inert unless the server actually
@@ -471,6 +479,7 @@ export function App() {
   const [settingsTotpOpen, setSettingsTotpOpen] = useState(false);
   const [credentialRevision, setCredentialRevision] = useState(0);
   const [tab, setTab] = useActiveTab();
+  const [activeCustomPageId, setActiveCustomPageId] = useState("");
   // Bumped when a failure elsewhere (a restore that needs the game images)
   // sends the operator to Updates to install them. A nonce rather than a
   // boolean so a second failure re-triggers it after the first was handled.
@@ -494,6 +503,7 @@ export function App() {
   const [backupRestoreTask, setBackupRestoreTask] = useState<Task | null>(null);
   const [homeTaskResult, setHomeTaskResult] = useState<HomeTaskResult | null>(null);
   const [storageCleanupResult, setStorageCleanupResult] = useState<HomeTaskResult | null>(null);
+  const [serverConfigResult, setServerConfigResult] = useState<HomeTaskResult | null>(null);
   const [storageCleanupOperation, setStorageCleanupOperation] = useState<StorageCleanupOperation>("");
   const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
@@ -524,6 +534,14 @@ export function App() {
     preloadPlayerAdminIconRailAssets();
   }, []);
 
+  useEffect(() => {
+    if (!activeCustomPageId) return;
+    const stillExists = (skin.customPages || []).some((cp) => cp.id === activeCustomPageId);
+    if (!stillExists) {
+      setActiveCustomPageId("");
+    }
+  }, [activeCustomPageId, skin.customPages]);
+
   // /api/auth/state exposes the public build version without requiring a
   // session. Keep watching through the logged-out state too: a Console
   // rebuild clears the in-memory session, and disabling the watcher at that
@@ -535,6 +553,7 @@ export function App() {
       setCsrfToken(null);
       setAuth(false);
       setPassword("");
+      setActiveCustomPageId("");
       setTab("Home");
       setMobileNavOpen(false);
       setRedeploySetupOpen(false);
@@ -989,22 +1008,288 @@ export function App() {
     );
   }
 
-  const visibleTitle = redeploySetupOpen ? "Redeploy" : tab;
+  const activeCustomDashboard = activeCustomPageId
+    ? (skin.customPages || []).find((cp) => cp.id === activeCustomPageId) || null
+    : null;
+  const visibleTitle = redeploySetupOpen ? "Redeploy" : activeCustomDashboard ? activeCustomDashboard.title : tab;
   const visibleSubtitle = redeploySetupOpen
     ? "Update setup values and redeploy your Dune server."
-    : "Run and manage your self-hosted Dune server from the browser.";
+    : activeCustomDashboard
+      ? activeCustomDashboard.subtitle
+      : skin.design.customBrandSubtitle?.trim() || "Run and manage your self-hosted Dune server from the browser.";
+  const brandTitle = skin.design.customBrandTitle?.trim() || "Dune Docker Console";
+  const renderedNavGroups = skin.id === "default" && (!skin.customPages || skin.customPages.length === 0)
+    ? navGroups.map((g) => ({
+        id: g.title,
+        title: g.title,
+        showCommunityLinks: g.title === "Community",
+        items: g.items.map((item) => ({ tab: item.tab as string, label: item.tab as string, icon: item.icon, isCustom: false }))
+      }))
+    : skin.navigation
+        .filter((g) => !g.hidden)
+        .map((g) => ({
+          id: g.id,
+          title: g.title,
+          showCommunityLinks: g.showCommunityLinks ?? g.id === "community",
+          items: g.items
+            .filter((item) => !item.hidden)
+            .map((item) => {
+              const isCustom = item.tab.startsWith("custom:");
+              return {
+                tab: item.tab,
+                label: item.customLabel?.trim() || item.tab,
+                icon: isCustom ? <LayoutDashboard size={18} /> : NAV_ICON_BY_TAB.get(item.tab as Tab) || <LayoutDashboard size={18} />,
+                isCustom,
+              };
+            })
+        }));
 
   const closeMobileNav = () => setMobileNavOpen(false);
+
+  const renderDashboardWidgetById = (widgetId: string) => {
+    const prefix = widgetId.split(".")[0];
+    if (prefix === "home") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <HomePanel
+            status={status}
+            readiness={readiness}
+            taskResult={homeTaskResult}
+            setTaskResult={setHomeTaskResult}
+            funcomTokenResult={funcomTokenResult}
+            setFuncomTokenResult={setFuncomTokenResult}
+            runningAction={homeRunningAction}
+            restartStartObserved={homeRestartStarted}
+            setRunningAction={setHomeRunningAction}
+            onLoad={loadStackStatus}
+            confirmAction={confirmDialog}
+            restartGate={restartGateChoice}
+            sampledAtMs={homeSampledAtMs}
+            setSampledAtMs={setHomeSampledAtMs}
+            onNavigate={(nextTab) => {
+              setRedeploySetupOpen(false);
+              setSelectedPinnedAddonId("");
+              setActiveCustomPageId("");
+              setTab(nextTab);
+            }}
+          />
+        </div>
+      );
+    }
+    if (prefix === "server") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <ServerPanel
+            setTask={setTask}
+            setStatus={setStatus}
+            status={status}
+            setReadiness={setReadiness}
+            setPorts={setPorts}
+            setDoctor={setDoctor}
+            ports={ports}
+            readiness={readiness}
+            doctor={doctor}
+            storageCleanupResult={storageCleanupResult}
+            serverConfigResult={serverConfigResult}
+            setServerConfigResult={setServerConfigResult}
+            setStorageCleanupResult={setStorageCleanupResult}
+            storageCleanupOperation={storageCleanupOperation}
+            setStorageCleanupOperation={setStorageCleanupOperation}
+            taskResult={homeTaskResult}
+            setTaskResult={setHomeTaskResult}
+            funcomTokenResult={funcomTokenResult}
+            setFuncomTokenResult={setFuncomTokenResult}
+            runningAction={homeRunningAction}
+            restartStartObserved={homeRestartStarted}
+            setRunningAction={setHomeRunningAction}
+            onError={setError}
+            confirmAction={confirmDialog}
+            restartGate={restartGateChoice}
+            onRedeploy={() => {
+              setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
+              setSelectedPinnedAddonId("");
+              setActiveCustomPageId("");
+              setRedeploySetupOpen(true);
+            }}
+          />
+        </div>
+      );
+    }
+    if (prefix === "settings") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <LazyTabBoundary label="Loading Settings">
+            <SettingsPanel
+              onPasswordChanged={logoutAfterPasswordChange}
+              publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
+              confirmAction={confirmDialog}
+              onTotpEnrollmentStarted={() => setSettingsTotpOpen(true)}
+              credentialRevision={credentialRevision}
+            />
+          </LazyTabBoundary>
+        </div>
+      );
+    }
+    if (prefix === "admin") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <LazyTabBoundary label="Loading Admin Tools">
+            <AdminToolsPanel onError={setError} confirmAction={confirmDialog} />
+          </LazyTabBoundary>
+        </div>
+      );
+    }
+    if (prefix === "backups") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <LazyTabBoundary label="Loading Backups">
+            <BackupsPanel
+              backupRestoreTask={backupRestoreTask}
+              setBackupRestoreTask={setBackupRestoreTask}
+              onError={setError}
+              confirmAction={confirmDialog}
+              chooseBackupIdentity={chooseBackupIdentity}
+              chooseAuditLogAction={chooseAuditLogAction}
+              onInstallGameFiles={() => {
+                setInstallGameFilesRequest((current) => current + 1);
+                setActiveCustomPageId("");
+                setTab("Updates");
+              }}
+              chooseImportConflict={chooseImportConflict}
+              waitForTask={waitForTaskSilently}
+              waitForTaskWithUpdates={waitForTaskWithUpdates}
+              withTimeout={withTimeout}
+              toHourMinuteTime={toHourMinuteTime}
+              sanitizeTimeInput={sanitizeTimeInput}
+              isValidHourMinuteTime={isValidHourMinuteTime}
+              commandStatusSummary={commandStatusSummary}
+              taskTechnicalDetails={taskTechnicalDetails}
+              isTerminalTask={isTerminalTask}
+            />
+          </LazyTabBoundary>
+        </div>
+      );
+    }
+    if (prefix === "database") {
+      return (
+        <div className={`skin-embedded-source skin-embedded-single-${widgetId.replace(".", "-")}`}>
+          <LazyTabBoundary label="Loading Database">
+            <DatabasePanel />
+          </LazyTabBoundary>
+        </div>
+      );
+    }
+    if (widgetId === "panel.players") {
+      return (
+        <LazyTabBoundary label="Loading Players">
+          <PlayersPanel
+            onError={setError}
+            confirmAction={confirmDialog}
+            onOpenBase={(baseId) => {
+              setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 }));
+              setActiveCustomPageId("");
+              setTab("Bases");
+            }}
+            renderCharacterAdmin={(props) => (
+              <LazyTabBoundary label="Loading Player Details">
+                <CharacterAdminUI
+                  {...props}
+                  onError={setError}
+                  confirmAction={confirmDialog}
+                  waitForTask={waitForTaskSilently}
+                  formatMutationResult={formatMutationResult}
+                  restartGate={restartGateChoice}
+                />
+              </LazyTabBoundary>
+            )}
+          />
+        </LazyTabBoundary>
+      );
+    }
+    if (widgetId === "panel.guilds") {
+      return <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.bases") {
+      return <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.vehicles") {
+      return <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.exchange") {
+      return <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.landsraad") {
+      return <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.liveMap") {
+      return (
+        <LazyTabBoundary label="Loading Live Map">
+          <LiveMapPanel
+            onError={setError}
+            confirmAction={confirmDialog}
+            waitForTask={waitForTaskSilently}
+            taskTechnicalDetails={taskTechnicalDetails}
+            onOpenBase={(baseId) => {
+              setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 }));
+              setActiveCustomPageId("");
+              setTab("Bases");
+            }}
+            onOpenVehicle={(vehicleId) => {
+              setVehicleFocusRequest((current) => ({ vehicleId, nonce: current.nonce + 1 }));
+              setActiveCustomPageId("");
+              setTab("Vehicles");
+            }}
+          />
+        </LazyTabBoundary>
+      );
+    }
+    if (widgetId === "panel.maps") {
+      return <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.carePackage") {
+      return <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.addons") {
+      return <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.logs") {
+      return <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.chat") {
+      return <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>;
+    }
+    if (widgetId === "panel.updates") {
+      return (
+        <LazyTabBoundary label="Loading Updates">
+          <UpdatesPanel
+            installGameFilesRequest={installGameFilesRequest}
+            onInstallGameFilesHandled={() => setInstallGameFilesRequest(0)}
+            onStackStatus={setStackVersionStatus}
+            installedConsoleVersion={installedVersion}
+            confirmAction={confirmDialog}
+            waitForTask={waitForTaskSilently}
+            parseKeyValueText={parseKeyValueText}
+            formatTimerStatus={formatTimerStatus}
+            commandStatusSummary={commandStatusSummary}
+            taskTechnicalDetails={taskTechnicalDetails}
+            formatResultTitle={formatResultTitle}
+            formatResultMessage={formatResultMessage}
+          />
+        </LazyTabBoundary>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="app-shell">
       <ConsoleLanguageObserver />
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <button className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setTab("Home"); closeMobileNav(); }} title="Open Home">
-            <h1>Dune Docker Console</h1>
+          <button className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setActiveCustomPageId(""); setTab("Home"); closeMobileNav(); }} title="Open Home">
+            <h1>{brandTitle}</h1>
           </button>
-          <button className="stack-version-button" title={stackVersionButtonTitle(stackBadgeStatus)} aria-label={stackVersionButtonTitle(stackBadgeStatus)} onClick={() => { setRedeploySetupOpen(false); setTab("Updates"); closeMobileNav(); }}>{stackVersionButtonLabel(stackBadgeStatus)}</button>
+          <button className="stack-version-button" title={stackVersionButtonTitle(stackBadgeStatus)} aria-label={stackVersionButtonTitle(stackBadgeStatus)} onClick={() => { setRedeploySetupOpen(false); setActiveCustomPageId(""); setTab("Updates"); closeMobileNav(); }}>{stackVersionButtonLabel(stackBadgeStatus)}</button>
           <button
             className="sidebar-menu-toggle"
             type="button"
@@ -1015,21 +1300,31 @@ export function App() {
           >{mobileNavOpen ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
         <nav id="console-navigation" className={`sidebar-nav ${mobileNavOpen ? "mobile-open" : ""}`}>
-          {navGroups.map((group) => (
-            <section className="sidebar-nav-group" key={group.title} aria-label={group.title}>
+          {renderedNavGroups.map((group) => (
+            <section className="sidebar-nav-group" key={group.id} aria-label={group.title}>
               <p className="sidebar-nav-heading">{group.title}</p>
-              {group.items.map((item) => (
+              {group.items.map((item) => {
+                const isItemActive = activeCustomPageId
+                  ? activeCustomPageId === item.tab
+                  : tab === item.tab && (!selectedPinnedAddonId || item.tab !== "Addons");
+                return (
                 <Fragment key={item.tab}>
-                  <button className={tab === item.tab && (!selectedPinnedAddonId || item.tab !== "Addons") ? "active" : ""} onClick={() => {
+                  <button className={isItemActive ? "active" : ""} title={item.label} onClick={() => {
                     setRedeploySetupOpen(false);
                     setSelectedPinnedAddonId("");
-                    setTab(item.tab);
+                    if (item.isCustom) {
+                      setActiveCustomPageId(item.tab);
+                    } else {
+                      setActiveCustomPageId("");
+                      setTab(item.tab as Tab);
+                    }
                     closeMobileNav();
-                  }}><span className="sidebar-nav-main">{item.icon}<span>{item.tab}</span></span><SidebarNavIndicators item={item.tab} onlinePlayerCount={onlinePlayerCount} addonUpdatesAvailable={addonUpdatesAvailable} /></button>
+                  }}><span className="sidebar-nav-main">{item.icon}<span>{item.label}</span></span>{!item.isCustom && <SidebarNavIndicators item={item.tab as Tab} onlinePlayerCount={onlinePlayerCount} addonUpdatesAvailable={addonUpdatesAvailable} />}</button>
                   {item.tab === "Addons" && pinnedAddons.length > 0 && <div className="sidebar-addon-children">
                     {pinnedAddons.map((addon) => (
-                      <button key={addon.id} className={tab === "Addons" && selectedPinnedAddonId === addon.id ? "active" : ""} onClick={() => {
+                      <button key={addon.id} className={!activeCustomPageId && tab === "Addons" && selectedPinnedAddonId === addon.id ? "active" : ""} onClick={() => {
                         setRedeploySetupOpen(false);
+                        setActiveCustomPageId("");
                         setSelectedPinnedAddonId(addon.id);
                         setTab("Addons");
                         closeMobileNav();
@@ -1037,8 +1332,9 @@ export function App() {
                     ))}
                   </div>}
                 </Fragment>
-              ))}
-              {group.title === "Community" && (
+                );
+              })}
+              {group.showCommunityLinks && (
                 <>
                   <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><MessageCircle size={18} aria-hidden="true" /><span>Requests</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
                   <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><Bug size={18} aria-hidden="true" /><span>Report Issues</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
@@ -1049,8 +1345,8 @@ export function App() {
           ))}
         </nav>
       </aside>
-      <main className={!redeploySetupOpen && tab === "Home" ? "home-main" : undefined}>
-        {!redeploySetupOpen && tab === "Home" && (
+      <main className={!redeploySetupOpen && !activeCustomDashboard && tab === "Home" ? "home-main" : undefined}>
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Home" && (
           <div className="home-backdrop" aria-hidden="true">
             <span className="home-sand-fine" />
             <span className="home-sand-near" />
@@ -1082,34 +1378,52 @@ export function App() {
               }}
             ><Globe size={19} aria-hidden="true" /></button>
             <ThemeLauncher onOpen={closeMobileNav} />
+            <SkinStudioLauncher onOpen={closeMobileNav} />
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
         </header>
         {error && <div className="error-banner">{error}</div>}
+        <CrossPageWidgetRendererContext.Provider
+          value={(w) => (
+            <CrossPageWidgetRendererContext.Provider value={null}>
+              {renderDashboardWidgetById(w.id)}
+            </CrossPageWidgetRendererContext.Provider>
+          )}
+        >
         {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
-        {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
-        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
+        {!redeploySetupOpen && activeCustomDashboard && (
+          <CustomDashboardView
+            dashboard={activeCustomDashboard}
+            renderSourceWidget={(w) => (
+              <CrossPageWidgetRendererContext.Provider value={null}>
+                {renderDashboardWidgetById(w.id)}
+              </CrossPageWidgetRendererContext.Provider>
+            )}
+          />
+        )}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} serverConfigResult={serverConfigResult} setServerConfigResult={setServerConfigResult} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);
         }} />}
-        {!redeploySetupOpen && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Players" && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Guilds" && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Bases" && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Vehicles" && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Exchange" && <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} onOpenVehicle={(vehicleId) => { setVehicleFocusRequest((current) => ({ vehicleId, nonce: current.nonce + 1 })); setTab("Vehicles"); }} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {(languagePickerOpen || tab === "Language") && <LazyTabBoundary label="Loading Language"><LanguagePanel onClose={() => {setLanguagePickerOpen(false);if(tab === "Language")setTab("Home");}} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Players" && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Guilds" && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Bases" && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Vehicles" && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Exchange" && <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} onOpenVehicle={(vehicleId) => { setVehicleFocusRequest((current) => ({ vehicleId, nonce: current.nonce + 1 })); setTab("Vehicles"); }} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {(languagePickerOpen || (!activeCustomDashboard && tab === "Language")) && <LazyTabBoundary label="Loading Language"><LanguagePanel onClose={() => {setLanguagePickerOpen(false);if(tab === "Language")setTab("Home");}} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
             backupRestoreTask={backupRestoreTask}
             setBackupRestoreTask={setBackupRestoreTask}
             onError={setError}
@@ -1128,9 +1442,9 @@ export function App() {
             taskTechnicalDetails={taskTechnicalDetails}
             isTerminalTask={isTerminalTask}
           /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Chat" && <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Chat" && <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>}
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
             installGameFilesRequest={installGameFilesRequest}
             onInstallGameFilesHandled={() => setInstallGameFilesRequest(0)}
             onStackStatus={setStackVersionStatus}
@@ -1144,13 +1458,14 @@ export function App() {
             formatResultTitle={formatResultTitle}
             formatResultMessage={formatResultMessage}
           /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel
+        {!redeploySetupOpen && !activeCustomDashboard && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel
           onPasswordChanged={logoutAfterPasswordChange}
           publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
           confirmAction={confirmDialog}
           onTotpEnrollmentStarted={() => setSettingsTotpOpen(true)}
           credentialRevision={credentialRevision}
         /></LazyTabBoundary>}
+        </CrossPageWidgetRendererContext.Provider>
         {!redeploySetupOpen && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
         <AppFooter />
       </main>

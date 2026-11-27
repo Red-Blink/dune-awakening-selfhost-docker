@@ -76,6 +76,9 @@ case "${1:-} ${2:-}" in
     # installed-size measurement all arrive here. Succeeding is what lets the
     # asset phase run to completion.
     case "$*" in
+      *"mktemp -d /srv/dune/server/.tank-update."*) echo /srv/dune/server/.tank-update.fixture ;;
+      *"orchestrator awk"*".tank-update.fixture"*) echo "${MOCK_STAGE_BUILD:-2}" ;;
+      *"--stage-world"*) echo '{"tag":"2-0-shipping"}' ;;
       *"app_info_print"*)
         if [ "${MOCK_UPDATE_AVAILABLE:-0}" = "1" ]; then
           printf 'Local build: 1\nRemote build: 2\nUpdate available.\n'
@@ -361,3 +364,28 @@ MOCK_LIFECYCLE_PROBE=runtime/scripts/probe-update-lock.sh MOCK_UPDATE_AVAILABLE=
 [ "$status" -eq 42 ] || fail "update did not propagate final startup failure" "$test_root/failed-startup.log"
 flock -n "$project/runtime/generated/battlegroup-lifecycle.lock" true || fail "failed update leaked the lock"
 echo "PASS failed-update-propagates-error-and-releases-lock"
+
+touch "$project/runtime/generated/experimental-tanks.json"
+cp "$repo_root"/runtime/scripts/{verify-game-images.py,install-staged-game.py} "$project/runtime/scripts/"
+cat > "$project/runtime/scripts/experimental-tanks.sh" <<'TANK'
+#!/usr/bin/env bash
+case "$1" in
+  update-enabled) echo "${MOCK_TANKS_ENABLED:-yes}" ;;
+  prepare-update) exit "${MOCK_TANKS_RESULT:-0}" ;;
+  finish-update) echo finish-update >> "${MOCK_DOCKER_LOG:?}" ;;
+  *) exit 99 ;;
+esac
+TANK
+chmod +x "$project/runtime/scripts/experimental-tanks.sh"
+export MOCK_UPDATE_AVAILABLE=1 MOCK_RUNNING_CONTAINERS=dune-postgres DUNE_STEAMCMD_MAX_ATTEMPTS=1
+if MOCK_TANKS_RESULT=1 run_update tanks-rejected --yes; then fail "accepted incompatible Tanks"; fi
+grep -q '^DUNE_GAME_UPDATE_PAUSED=TANK_COMPATIBILITY' "$test_root/tanks-rejected.log" || fail "missing Tank warning" "$test_root/tanks-rejected.log"
+[ ! -s "$calls_log" ] || fail "touched live services after rejection" "$calls_log"
+if MOCK_STAGE_BUILD=1 run_update tanks-stale --yes; then fail "accepted stale Steam download"; fi
+if grep -q -- '--stage-world' "$docker_log"; then fail "verified wrong Steam build"; fi
+run_update tanks-compatible --yes || fail "compatible update failed" "$test_root/tanks-compatible.log"
+grep -q '^finish-update$' "$docker_log" || fail "compatible policy was not activated"
+[ "$(grep -c 'orchestrator dune download$' "$docker_log")" = 1 ] || fail "compatible update downloaded twice"
+MOCK_TANKS_ENABLED=no run_update tanks-disabled --yes || fail "disabled update failed" "$test_root/tanks-disabled.log"
+if grep -Eq 'tank-update.fixture|--stage-world|finish-update' "$docker_log"; then fail "checked disabled Tanks"; fi
+echo "PASS compatible, incompatible, stale and disabled Tank updates"

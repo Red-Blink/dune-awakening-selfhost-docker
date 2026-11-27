@@ -113,31 +113,31 @@ describe("update diagnostics retention", () => {
     expect(loadPersistedUpdateTask(GAME_UPDATE_TASK_KEY)).toBeNull();
   });
 
-  const blockedTask: Task = { ...task, operation: "updateApply", status: "failed", errorMessage: "dune update --yes failed with exit 1", logLines: [{ timestamp: "", stream: "stderr", line: "Disable Experimental Tanks in Settings before updating game-server files. The Tank patch must be verified for each new game build." }] };
+  const blockedTask: Task = { ...task, operation: "updateApply", status: "failed", errorMessage: "dune update --yes failed with exit 1", logLines: [{ timestamp: "", stream: "stderr", line: "DUNE_GAME_UPDATE_PAUSED=TANK_COMPATIBILITY" }] };
 
   it("does not restore an old Tank warning when the user opens Updates", async () => {
     window.localStorage.setItem(GAME_UPDATE_TASK_KEY, JSON.stringify(blockedTask));
     await act(async () => { renderPanel(0, vi.fn().mockResolvedValue(true)); });
-    expect(screen.queryByText("Game Update Blocked")).toBeNull();
+    expect(screen.queryByText("Game Update Paused")).toBeNull();
     expect(window.localStorage.getItem(GAME_UPDATE_TASK_KEY)).toBeNull();
   });
 
   it("shows a short Tank warning only after Apply, then removes it without a Dismiss button or leftover panel", async () => {
     vi.mocked(updatesApi.applyGame).mockResolvedValue({ task: blockedTask });
     await act(async () => { renderPanel(0, vi.fn().mockResolvedValue(true)); });
-    expect(screen.queryByText("Game Update Blocked")).toBeNull();
+    expect(screen.queryByText("Game Update Paused")).toBeNull();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Apply Game Update" })); });
-    expect(screen.getByText("Game Update Blocked")).toBeVisible();
-    expect(screen.getByText(/Disable Regis Tanks in Settings → Experimental Features/)).toBeVisible();
+    expect(screen.getByText("Game Update Paused")).toBeVisible();
+    expect(screen.getByText(/can remove existing Tank vehicles/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry Game Update" })).toBeNull();
     expect(screen.queryByText("Update Log")).toBeNull();
     expect(screen.queryByLabelText(/Game update progress/)).toBeNull();
     expect(loadPersistedUpdateTask(GAME_UPDATE_TASK_KEY)).toBeNull();
     await act(async () => { await vi.advanceTimersByTimeAsync(UPDATE_RESULT_DISMISS_MS - 1000); });
-    expect(screen.getByText("Game Update Blocked")).toBeVisible();
+    expect(screen.getByText("Game Update Paused")).toBeVisible();
     await act(async () => { await vi.advanceTimersByTimeAsync(1001); });
-    expect(screen.queryByText("Game Update Blocked")).toBeNull();
+    expect(screen.queryByText("Game Update Paused")).toBeNull();
     expect(document.querySelector(".game-update-blocked-notice")).toBeNull();
     expect(screen.getByRole("button", { name: "Apply Game Update" })).toBeEnabled();
   });

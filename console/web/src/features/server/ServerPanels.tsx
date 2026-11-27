@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HomeHighlights } from "./HomeHighlights";
+import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 import type { Dispatch, SetStateAction } from "react";
 import type { Tab } from "../../App";
 import { ChevronDown, History, Play, Trash2 } from "lucide-react";
@@ -581,71 +582,79 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const identityLine = homeIdentityLine(identityCards);
 
   return (
-    <section className="grid home-grid" aria-labelledby="home-overview-heading">
+    <LayoutZone page="Home" className="grid home-grid" ariaLabelledBy="home-overview-heading">
       {/* The h2 is visually hidden but structurally real: without it the page
           jumps h1 -> h3 and this region has no accessible name. Each block's
           h3 (Battlegroup Status, Readiness & Health, Performance) sits under it. */}
       <h2 id="home-overview-heading" className="sr-only">Server Overview</h2>
-      <article className="hero-panel home-block home-status-block" aria-labelledby="home-status-heading">
-        {/* An h3, not a styled span: it is the peer of the "Readiness &
-            Health" and "Performance" headings, so matching them by using
-            the same element guarantees the same size and colour instead of
-            restating their computed value here. The reading sits beside it
-            rather than inside, so the heading text stays just the label. */}
-        <div className="home-hero-state">
-          <h3 id="home-status-heading" className="home-hero-state-label">Battlegroup Status:</h3>
-          {/* Explicit space: the dot between the label and the reading is an
-              empty element, so without it the heading's text content reads
-              "Battlegroup Status:Stopped" to a screen reader and to anyone
-              copying it. Whitespace-only text between flex items is not
-              rendered, so this costs nothing visually. */}
-          {" "}
-          <span className={`home-state-dot home-state-dot-${stateTone}`} aria-hidden="true" />
-          <span className={`home-hero-state-value home-hero-state-value-${stateTone}`}>{homeOverallHeading(overall?.value)}</span>
-        </div>
-        {/* The status above already says Starting/Restarting and the subsystem
-            rows show progress, so an in-flight action gets one line here instead
-            of a result card; the card is kept for outcomes. */}
-        <p className="home-hero-step" aria-live="polite">
-          {taskResult?.status === "running" && taskResult.message ? formatResultMessage(taskResult.message) : ""}
-        </p>
-        {/* Population is rendered apart from the rest of the line so its
-            WARN can survive: summarizeHomeStatus flags an unreadable count
-            ("14 / ?" or "Unavailable"), and the deleted Server Identity
-            band was the only thing that showed that. Folding it into the
-            plain summary string dropped the signal silently. */}
-        <p className="home-hero-identity">
-          {identityLine || (populationSegment ? "" : "Server details are still loading.")}
-          {populationSegment && <>
-            {identityLine ? " · " : ""}
-            <span className={populationWarn ? "home-population-warn" : undefined}>{populationSegment}</span>
-          </>}
-        </p>
-        <dl className="home-hero-meta">
-          {HOME_HERO_META_LABELS.map((label) => <div className="home-hero-meta-item" key={label}>
-            <dt>{label}</dt>
-            <dd>{formatDisplayValue(identityCards.find((item) => item.label === label)?.value || "Unknown")}</dd>
-          </div>)}
-          <div className="home-hero-meta-item home-last-restart">
-            <dt>Last Battlegroup Restart</dt>
-            <dd>{restartHistory?.lastBattlegroupRestart ? formatRestartTime(restartHistory.lastBattlegroupRestart.finishedAt) : "Not Recorded Yet"}</dd>
+      <LayoutWidget id="home.hero" widgetTitle="Battlegroup Status & Actions">
+        <article className="hero-panel home-block home-status-block" aria-labelledby="home-status-heading">
+          {/* An h3, not a styled span: it is the peer of the "Readiness &
+              Health" and "Performance" headings, so matching them by using
+              the same element guarantees the same size and colour instead of
+              restating their computed value here. The reading sits beside it
+              rather than inside, so the heading text stays just the label. */}
+          <div className="home-hero-state">
+            <h3 id="home-status-heading" className="home-hero-state-label">Battlegroup Status:</h3>
+            {/* Explicit space: the dot between the label and the reading is an
+                empty element, so without it the heading's text content reads
+                "Battlegroup Status:Stopped" to a screen reader and to anyone
+                copying it. Whitespace-only text between flex items is not
+                rendered, so this costs nothing visually. */}
+            {" "}
+            <span className={`home-state-dot home-state-dot-${stateTone}`} aria-hidden="true" />
+            <span className={`home-hero-state-value home-hero-state-value-${stateTone}`}>{homeOverallHeading(overall?.value)}</span>
           </div>
-        </dl>
-        <div className="action-row">
-          <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh(undefined, { fresh: true })}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
-          <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-          <button className="danger-button" disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
-          <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
-        </div>
-        <StatusFreshness sampledAtMs={sampledAtMs} />
-        <PendingRefillNote />
-        {taskResult && taskResult.status !== "running" && <HomeTaskResultCard result={taskResult} />}
-        {localError && <p className="error">{localError}</p>}
-      </article>
-      <HomeHighlights />
-      <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness, funcomTokenAuthFailure)} onNavigate={onNavigate} />
-      <HomePerformance performance={performance} error={performanceError} />
-    </section>
+          {/* The status above already says Starting/Restarting and the subsystem
+              rows show progress, so an in-flight action gets one line here instead
+              of a result card; the card is kept for outcomes. */}
+          <p className="home-hero-step" aria-live="polite">
+            {taskResult?.status === "running" && taskResult.message ? formatResultMessage(taskResult.message) : ""}
+          </p>
+          {/* Population is rendered apart from the rest of the line so its
+              WARN can survive: summarizeHomeStatus flags an unreadable count
+              ("14 / ?" or "Unavailable"), and the deleted Server Identity
+              band was the only thing that showed that. Folding it into the
+              plain summary string dropped the signal silently. */}
+          <p className="home-hero-identity">
+            {identityLine || (populationSegment ? "" : "Server details are still loading.")}
+            {populationSegment && <>
+              {identityLine ? " · " : ""}
+              <span className={populationWarn ? "home-population-warn" : undefined}>{populationSegment}</span>
+            </>}
+          </p>
+          <dl className="home-hero-meta">
+            {HOME_HERO_META_LABELS.map((label) => <div className="home-hero-meta-item" key={label}>
+              <dt>{label}</dt>
+              <dd>{formatDisplayValue(identityCards.find((item) => item.label === label)?.value || "Unknown")}</dd>
+            </div>)}
+            <div className="home-hero-meta-item home-last-restart">
+              <dt>Last Battlegroup Restart</dt>
+              <dd>{restartHistory?.lastBattlegroupRestart ? formatRestartTime(restartHistory.lastBattlegroupRestart.finishedAt) : "Not Recorded Yet"}</dd>
+            </div>
+          </dl>
+          <div className="action-row">
+            <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh(undefined, { fresh: true })}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
+            <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
+            <button className="danger-button" disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
+            <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
+          </div>
+          <StatusFreshness sampledAtMs={sampledAtMs} />
+          <PendingRefillNote />
+          {taskResult && taskResult.status !== "running" && <HomeTaskResultCard result={taskResult} />}
+          {localError && <p className="error">{localError}</p>}
+        </article>
+      </LayoutWidget>
+      <LayoutWidget id="home.highlights" widgetTitle="Feature Highlights">
+        <HomeHighlights />
+      </LayoutWidget>
+      <LayoutWidget id="home.subsystems" widgetTitle="Readiness & Health">
+        <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness, funcomTokenAuthFailure)} onNavigate={onNavigate} />
+      </LayoutWidget>
+      <LayoutWidget id="home.performance" widgetTitle="Host Performance">
+        <HomePerformance performance={performance} error={performanceError} />
+      </LayoutWidget>
+    </LayoutZone>
   );
 }
 
@@ -897,6 +906,8 @@ export function ServerPanel(props: {
   readiness: string;
   doctor: string;
   storageCleanupResult: HomeTaskResult | null;
+  serverConfigResult: HomeTaskResult | null;
+  setServerConfigResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   setStorageCleanupResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   storageCleanupOperation: StorageCleanupOperation;
   setStorageCleanupOperation: Dispatch<SetStateAction<StorageCleanupOperation>>;
@@ -918,12 +929,12 @@ export function ServerPanel(props: {
   const [restartEnabled, setRestartEnabled] = useState(false);
   const [restartTime, setRestartTime] = useState("05:00");
   const [scheduleResult, setScheduleResult] = useState<HomeTaskResult | null>(null);
-  const [serverTitle, setServerTitle] = useState("");
+  const [serverTitle, setServerTitle] = useState(() => findLineValue(props.status, ["title", "server title", "SERVER_TITLE"]) || "");
   const hostname = useServerHostname();
-  const [savedServerTitle, setSavedServerTitle] = useState("");
-  const [serverMode, setServerMode] = useState<ServerMode>("public");
-  const [savedServerMode, setSavedServerMode] = useState<ServerMode>("public");
-  const [titleResult, setTitleResult] = useState<HomeTaskResult | null>(null);
+  const [savedServerTitle, setSavedServerTitle] = useState(serverTitle);
+  const [serverMode, setServerMode] = useState<ServerMode>(() => normalizeServerMode(findLineValue(props.status, ["mode", "server mode", "SERVER_IP_MODE"])) || "public");
+  const [savedServerMode, setSavedServerMode] = useState<ServerMode>(serverMode);
+  const { serverConfigResult: titleResult, setServerConfigResult: setTitleResult } = props;
   const [funcomToken, setFuncomToken] = useState("");
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
   const [serviceRestartingService, setServiceRestartingService] = useState("");
@@ -1032,7 +1043,7 @@ export function ServerPanel(props: {
       titleChanged ? `title to "${title}"` : "",
       modeChanged ? `mode to ${titleCase(serverMode)}` : ""
     ].filter(Boolean).join(" and ");
-    if ((titleChanged || modeChanged) && !(await confirmAction(`Change server ${changeList}? This saves the setting and refreshes Director/Gateway only if they are already running.${hostnameChanged ? " The hostname will be saved afterward and requires your next Battlegroup restart." : ""}`))) return;
+    if ((titleChanged || modeChanged) && !(await confirmAction(`Change server ${changeList}? ${serverSettingsRestartNotice(modeChanged)}${hostnameChanged ? " The hostname will be saved afterward and requires your next Battlegroup restart." : ""}`))) return;
     setTitleResult({ status: "running", title: "Saving Settings" });
     props.onError("");
     try {
@@ -1041,11 +1052,16 @@ export function ServerPanel(props: {
         setTitleResult({ status: "succeeded", title: "Settings Saved — Battlegroup Restart Required" });
         return;
       }
-      const final = await waitForTaskSilently((await serverApi.saveConfig({
+      const final = await waitForTaskWithUpdates((await serverApi.saveConfig({
         ...(titleChanged ? { title } : {}),
         ...(modeChanged ? { mode: serverMode } : {})
-      })).task);
+      })).task, task => {
+        if (isTerminalTask(task.status)) return;
+        const title = serverSettingsProgressTitle(task.logLines);
+        setTitleResult(previous => previous?.title === title ? previous : { status: "running", title });
+      });
       const details = taskTechnicalDetails(final);
+      if (final.status === "succeeded") setTitleResult({ status: "running", title: "Refreshing Server Status" });
       await loadControlStatus(false).catch(() => null);
       if (final.status === "succeeded") {
         if (titleChanged) setSavedServerTitle(title);
@@ -1426,69 +1442,83 @@ export function ServerPanel(props: {
     return () => window.clearTimeout(id);
   }, [storageCleanupResult?.status, storageCleanupResult?.title]);
   return (
-    <section className="panel server-control-panel">
-      <h2>Server Controls</h2>
-      <section className="action-section server-title-section">
-        <h4>Server Configurations</h4>
-        <div className="action-line title-action-line">
-          <label>Current Server Title<input value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
-          <label className="compact-select">Mode<select value={serverMode} onChange={(event) => setServerMode(event.target.value as ServerMode)}>
-            <option value="public">Public</option>
-            <option value="local">Local</option>
+    <LayoutZone page="Server Control" className="panel server-control-panel">
+      <h2 className="wide">Server Controls</h2>
+      <LayoutWidget id="server.config" widgetTitle="Server Configurations">
+        <section className="action-section server-title-section">
+          <h4>Server Configurations</h4>
+          <div className="action-line title-action-line">
+            <label>Current Server Title<input disabled={titleSaving} value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
+            <label className="compact-select">Mode<select disabled={titleSaving} value={serverMode} onChange={(event) => setServerMode(event.target.value as ServerMode)}>
+              <option value="public">Public</option>
+              <option value="local">Local</option>
+            </select></label>
+            <ServerHostnameSetting hostname={hostname} disabled={actionRunning || serviceRestartRunning || titleSaving} />
+            <button disabled={actionRunning || serviceRestartRunning || titleSaving || !hostname.ready || !hostname.valid} onClick={saveServerConfig}>Save Settings</button>
+            {titleResult && <span role="status" className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(titleResult.title, titleResult.status === "running")}</strong>
+            </span>}
+          </div>
+        </section>
+      </LayoutWidget>
+      <LayoutWidget id="server.lifecycle" widgetTitle="Battlegroup & Service Controls">
+        <div className="action-row">
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
+          <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button>
+        </div>
+        <PendingRefillNote />
+        {taskResult && <HomeTaskResultCard result={taskResult} />}
+        <div className="action-line restart-service-line">
+          <label className="compact-select">Restart Service<select value={service} onChange={(event) => setService(event.target.value)}>
+            {RESTARTABLE_SERVICES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select></label>
-          <ServerHostnameSetting hostname={hostname} disabled={actionRunning || serviceRestartRunning || titleSaving} />
-          <button disabled={actionRunning || serviceRestartRunning || titleSaving || !hostname.ready || !hostname.valid} onClick={saveServerConfig}>Save Settings</button>
-          {titleResult && <span className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
-            <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(titleResult.title, titleResult.status === "running")}</strong>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={restartSelectedService}>Restart Service</button>
+          {serviceRestartResult && <span className={`inline-task-result result-${serviceRestartResult.status === "succeeded" ? "ok" : serviceRestartResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={serviceRestartResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serviceRestartResult.title, serviceRestartResult.status === "running")}</strong>
           </span>}
         </div>
-      </section>
-      <div className="action-row">
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-        <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button>
-      </div>
-      <PendingRefillNote />
-      {taskResult && <HomeTaskResultCard result={taskResult} />}
-      <div className="action-line restart-service-line">
-        <label className="compact-select">Restart Service<select value={service} onChange={(event) => setService(event.target.value)}>
-          {RESTARTABLE_SERVICES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select></label>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={restartSelectedService}>Restart Service</button>
-        {serviceRestartResult && <span className={`inline-task-result result-${serviceRestartResult.status === "succeeded" ? "ok" : serviceRestartResult.status === "failed" ? "fail" : "running"}`}>
-          <strong className={serviceRestartResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serviceRestartResult.title, serviceRestartResult.status === "running")}</strong>
-        </span>}
-      </div>
-      <RestartHistoryPanel refreshKey={`${taskResult?.status || ""}:${serviceRestartResult?.status || ""}`} />
-      <ReadinessTimeline text={props.readiness} statusText={props.status} />
-      <PortChecklist text={props.ports} statusText={props.status} />
-      <section className="action-section">
-        <div className="panel-title"><h4>Change Funcom Token</h4></div>
-        <div className="action-line funcom-token-action-line">
-          <label className="funcom-token-field"><SecretInput aria-label="Funcom token" value={funcomToken} onChange={(event) => setFuncomToken(event.target.value)} placeholder="Paste new token" /></label>
-          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={saveFuncomToken}>Save Token</button>
-          {funcomTokenResult && <span className={`inline-task-result result-${funcomTokenResult.status === "succeeded" ? "ok" : funcomTokenResult.status === "failed" ? "fail" : "running"}`}>
-            <strong className={funcomTokenResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(funcomTokenResult.title, funcomTokenResult.status === "running")}</strong>
-            {funcomTokenResult.message && <span className="inline-task-message">{formatResultMessage(funcomTokenResult.message)}</span>}
-          </span>}
-        </div>
-      </section>
-      <DoctorSummary
-        text={props.doctor}
-        readiness={props.readiness}
-        loading={doctorLoading}
-        error={doctorError}
-        onFixBinding={fixNetworkBinding}
-        onCleanupImages={() => { void cleanupDockerStorage("images"); }}
-        onCleanupBuildCache={() => { void cleanupDockerStorage("build-cache"); }}
-        fixingBinding={networkBindResult?.status === "running"}
-        cleanupOperation={storageCleanupOperation}
-        fixDisabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || storageCleanupRunning}
-      />
-      {networkBindResult && <HomeTaskResultCard result={networkBindResult} />}
-      {storageCleanupResult && <HomeTaskResultCard result={storageCleanupResult} />}
-    </section>
+      </LayoutWidget>
+      <LayoutWidget id="server.history" widgetTitle="Restart History">
+        <RestartHistoryPanel refreshKey={`${taskResult?.status || ""}:${serviceRestartResult?.status || ""}`} />
+      </LayoutWidget>
+      <LayoutWidget id="server.readiness" widgetTitle="Readiness Timeline">
+        <ReadinessTimeline text={props.readiness} statusText={props.status} />
+      </LayoutWidget>
+      <LayoutWidget id="server.ports" widgetTitle="Port Checklist">
+        <PortChecklist text={props.ports} statusText={props.status} />
+      </LayoutWidget>
+      <LayoutWidget id="server.token" widgetTitle="Change Funcom Token">
+        <section className="action-section">
+          <div className="panel-title"><h4>Change Funcom Token</h4></div>
+          <div className="action-line funcom-token-action-line">
+            <label className="funcom-token-field"><SecretInput aria-label="Funcom token" value={funcomToken} onChange={(event) => setFuncomToken(event.target.value)} placeholder="Paste new token" /></label>
+            <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={saveFuncomToken}>Save Token</button>
+            {funcomTokenResult && <span className={`inline-task-result result-${funcomTokenResult.status === "succeeded" ? "ok" : funcomTokenResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={funcomTokenResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(funcomTokenResult.title, funcomTokenResult.status === "running")}</strong>
+              {funcomTokenResult.message && <span className="inline-task-message">{formatResultMessage(funcomTokenResult.message)}</span>}
+            </span>}
+          </div>
+        </section>
+      </LayoutWidget>
+      <LayoutWidget id="server.doctor" widgetTitle="Doctor Diagnostics & Storage Cleanup">
+        <DoctorSummary
+          text={props.doctor}
+          readiness={props.readiness}
+          loading={doctorLoading}
+          error={doctorError}
+          onFixBinding={fixNetworkBinding}
+          onCleanupImages={() => { void cleanupDockerStorage("images"); }}
+          onCleanupBuildCache={() => { void cleanupDockerStorage("build-cache"); }}
+          fixingBinding={networkBindResult?.status === "running"}
+          cleanupOperation={storageCleanupOperation}
+          fixDisabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || storageCleanupRunning}
+        />
+        {networkBindResult && <HomeTaskResultCard result={networkBindResult} />}
+        {storageCleanupResult && <HomeTaskResultCard result={storageCleanupResult} />}
+      </LayoutWidget>
+    </LayoutZone>
   );
 }
 
@@ -1586,6 +1616,20 @@ async function waitForTaskWithUpdates(task: Task, onUpdate: (task: Task) => void
     onUpdate(current);
   }
   return current;
+}
+
+export function serverSettingsRestartNotice(modeChanged: boolean) {
+  return modeChanged
+    ? "Changing network mode restarts Director, Gateway, Survival_1, and Overmap if running. Players on affected maps will disconnect. The change can take several minutes."
+    : "Changing the title restarts Director and Gateway if running. Restarting Director also restarts a running Survival_1 and disconnects its players.";
+}
+
+export function serverSettingsProgressTitle(lines: Pick<Task["logLines"][number], "line">[]) {
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const match = /^Restarting (director|gateway|Survival_1|Overmap) so /.exec(lines[index].line.trim());
+    if (match) return `Restarting ${match[1][0].toUpperCase()}${match[1].slice(1)}`;
+  }
+  return "Saving Settings";
 }
 
 

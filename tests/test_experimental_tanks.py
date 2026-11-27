@@ -23,6 +23,64 @@ IMAGE = 'sha256:' + '1' * 64
 
 
 class TankTests(unittest.TestCase):
+    def test_staged_install_replaces_archives_and_defers_steam_build_marker(self):
+        installer = importlib.util.spec_from_file_location('installer', ROOT / 'runtime/scripts/install-staged-game.py')
+        module = importlib.util.module_from_spec(installer)
+        installer.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stage = root / '.tank-update.fixture/install'
+            marker = Path('steamapps/appmanifest_42.acf')
+            for tree, version in [(stage, 'new'), (root, 'old')]:
+                (tree / 'images').mkdir(parents=True)
+                (tree / marker.parent).mkdir()
+                (tree / marker).write_text(version)
+                (tree / 'images' / version).touch()
+            (root / 'keep').touch()
+            (stage / 'tool').touch()
+            module.install(stage, '42')
+            self.assertEqual([p.name for p in (root / 'images').iterdir()], ['new'])
+            self.assertTrue((root / 'keep').exists() and (root / 'tool').exists())
+            self.assertEqual((root / marker).read_text(), 'old')
+            self.assertEqual((stage / marker).read_text(), 'new')
+
+    def test_update_rejects_changed_stock_inputs_before_saving_policy(self):
+        candidate = {'tag': '9999999-0-shipping', 'image': IMAGE, 'config': IMAGE, 'digest': IMAGE}
+        def inspect_image(*args, **kwargs):
+            return json.dumps([{'Os': 'linux', 'Architecture': 'amd64', 'Config': {},
+                                'RootFS': {'Layers': [args[-1]]}}])
+        with patch.object(tanks, 'read_state', return_value={'enabled': True, 'build': TAG}), \
+                patch.object(tanks, 'base_image_id', return_value='reviewed'), \
+                patch.object(tanks, 'run', side_effect=inspect_image), \
+                patch.object(tanks, 'build') as build, patch.object(tanks, 'save_json') as save:
+            with self.assertRaisesRegex(ValueError, 'differs from the reviewed'):
+                tanks.prepare_update(candidate)
+            build.assert_not_called()
+            save.assert_not_called()
+
+    def test_update_stages_verified_retag_without_switching_active_hagga(self):
+        source = tanks.manifest(TAG)
+        candidate = {'tag': '9999999-0-shipping', 'image': IMAGE, 'config': source['baseConfigId'],
+                     'digest': IMAGE}
+        original = {'enabled': True, 'build': TAG, 'imageId': 'old'}
+        hashes = ''.join(f'{digest}  {name}\n' for name, digest in source['assets'].items())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'patches').symlink_to(ROOT / 'patches')
+            with patch.object(tanks, 'ROOT', root), patch.object(tanks, 'STATE', root / 'active.json'), \
+                    patch.object(tanks, 'build', return_value=IMAGE), patch.object(tanks, 'run', return_value=hashes):
+                tanks.save(original)
+                tanks.prepare_update(candidate)
+                self.assertEqual(tanks.read_state()['build'], TAG)
+                self.assertEqual(tanks.manifest(candidate['tag'])['sourceTag'], TAG)
+                with patch.object(tanks, 'base_image_id', return_value='unexpected'):
+                    with self.assertRaisesRegex(ValueError, 'differs'):
+                        tanks.finish_update(candidate['tag'])
+                with patch.object(tanks, 'base_image_id', return_value=IMAGE):
+                    self.assertEqual(tanks.image_for_map(candidate['tag'], 'Survival_1'), IMAGE)
+                    tanks.finish_update(candidate['tag'])
+                self.assertEqual(tanks.read_state(), {'enabled': True, 'build': candidate['tag'], 'imageId': IMAGE})
+
     def test_versioned_manifest_rejects_unknown_and_traversal(self):
         for tag in ('../2134304', '2134304-0-shipping/../../', '9999999-0-shipping', ''):
             self.assertIsNone(tanks.manifest(tag))

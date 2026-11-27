@@ -29,7 +29,7 @@ def read_state():
     return value
 
 
-def manifest(tag):
+def reviewed_manifest(tag):
     if not re.fullmatch(r'[0-9]+-0-shipping', tag):
         return None
     path = ROOT / 'patches/experimental-tanks' / tag.split('-', 1)[0] / 'manifest.json'
@@ -39,6 +39,29 @@ def manifest(tag):
     if spec.get('worldTag') != tag or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', spec.get('version', '')):
         raise ValueError('The Tank manifest does not match the requested game build.')
     return spec
+
+
+def receipt_path(tag):
+    return ROOT / 'runtime/generated/tank-compatible-builds' / (tag + '.json')
+
+
+def manifest(tag):
+    spec = reviewed_manifest(tag)
+    if not re.fullmatch(r'[0-9]+-0-shipping', tag) or not receipt_path(tag).exists():
+        return spec
+    receipt = json.loads(receipt_path(tag).read_text())
+    source = reviewed_manifest(receipt['source'])
+    if not source or (spec and spec['worldTag'] != source['worldTag']):
+        return spec
+    return compatible_spec(source, tag, receipt)
+
+
+def compatible_spec(source, tag, receipt):
+    variants = [{'imageId': receipt['digest'], 'configId': receipt['config']}]
+    if source['worldTag'] == tag:
+        variants += source.get('additionalBaseImages', [])
+    return {**source, 'worldTag': tag, 'sourceTag': source['worldTag'],
+            'additionalBaseImages': variants}
 
 
 INTERRUPTED_APPLY = 'The previous operation was interrupted. Apply Tank settings again to reconcile Hagga.'
@@ -91,14 +114,18 @@ def status(tag):
 
 
 def save(state):
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(dir=STATE.parent, prefix='.experimental-tanks-')
+    save_json(STATE, state)
+
+
+def save_json(path, state):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix='.experimental-tanks-')
     try:
         with os.fdopen(fd, 'w') as f:
             json.dump(state, f)
             f.write('\n')
         os.chmod(name, 0o644)
-        os.replace(name, STATE)
+        os.replace(name, path)
     finally:
         if os.path.exists(name):
             os.unlink(name)
@@ -123,12 +150,18 @@ def restore_missing_image(tag):
     """Rebuild a pruned opt-in image from the pinned inputs, never fall back to stock."""
     def prepare():
         state = read_state()
-        if not state['enabled'] or state.get('build') != tag:
+        pending = state.get('preparedUpdate', {})
+        use_pending = pending.get('build') == tag and base_image_id(manifest(tag)) in (
+            pending['digest'], pending['config'])
+        if not state['enabled'] or (state.get('build') != tag and not use_pending):
             raise ValueError('Tank settings changed. Retry starting Hagga.')
         if state.get('applying') and os.environ.get('DUNE_TANK_APPLY') != '1':
             raise ValueError('Hagga image settings are being applied. Wait for this operation to finish.')
         image_id = build(tag)
-        save({**state, 'imageId': image_id})
+        if use_pending:
+            save({**state, 'preparedUpdate': {**pending, 'imageId': image_id}})
+        else:
+            save({**state, 'imageId': image_id})
         return image_id
 
     if os.environ.get('DUNE_BATTLEGROUP_LIFECYCLE_LOCK_HELD') == '1':
@@ -150,6 +183,11 @@ def image_for_map(tag, map_name):
         return None
     if os.environ.get('DUNE_GAME_SERVER_IMAGE'):
         raise ValueError('A custom global game image cannot be combined with Experimental Tanks.')
+    pending = state.get('preparedUpdate')
+    if pending and pending['build'] == tag:
+        actual = base_image_id(manifest(tag))
+        if actual in (pending['digest'], pending['config']):
+            state = {**state, 'build': tag, 'imageId': pending['imageId']}
     if not manifest(tag) or state.get('build') != tag:
         raise ValueError('Experimental Tanks do not support this game build. Disable them before starting Hagga.')
     image_id = state.get('imageId', '')
@@ -275,14 +313,15 @@ def base_image_id(spec, reference=None):
     return image_id
 
 
-def build(tag, base_reference=None):
-    spec = manifest(tag)
+def build(tag, base_reference=None, *, recipe=None):
+    spec = recipe or manifest(tag)
     if not spec:
         raise ValueError('This game build is not supported by Experimental Tanks.')
     if os.environ.get('DUNE_GAME_SERVER_IMAGE'):
         raise ValueError('Remove the custom global game image override before enabling Experimental Tanks.')
     build_number = tag.split('-', 1)[0]
-    directory = ROOT / 'patches/experimental-tanks' / build_number
+    source_tag = spec.get('sourceTag', tag)
+    directory = ROOT / 'patches/experimental-tanks' / source_tag.split('-', 1)[0]
     assets = directory / 'assets'
     for name, expected in spec['assets'].items():
         if Path(name).name != name or name in ('', '.', '..'):
@@ -308,7 +347,7 @@ def build(tag, base_reference=None):
         patched.chmod(0o755)
         (context / 'clean').unlink()
         shutil.copytree(assets, context / 'assets')
-        shutil.copy(directory / 'Dockerfile', context)
+        (context / 'Dockerfile').write_text((directory / 'Dockerfile').read_text().replace(source_tag, tag))
         run('docker', 'build', '--pull=false', '--network=none', '--build-arg',
             'BASE_IMAGE=' + base_tag, '-t', image_tag, str(context), diagnostics=True)
     image_id = run('docker', 'image', 'inspect', '--format', '{{.Id}}', image_tag, capture=True).strip()
@@ -318,13 +357,71 @@ def build(tag, base_reference=None):
     return image_id
 
 
+def prepare_update(candidate):
+    tag = candidate['tag']
+    if not re.fullmatch(r'[0-9]+-0-shipping', tag):
+        raise ValueError('Unrecognized world image tag.')
+    state = read_state()
+    if not state['enabled'] or state.get('applying') or state.get('error'):
+        raise ValueError('Resolve the current Tank settings before updating.')
+    source = reviewed_manifest(tag)
+    if not source:
+        current = manifest(state['build'])
+        if not current:
+            raise ValueError('No reviewed Tank base is available for this update.')
+        source = reviewed_manifest(current.get('sourceTag', current['worldTag']))
+    approved = {source['baseConfigId'], source['baseImage'].split('@')[1]}
+    for variant in source.get('additionalBaseImages', []):
+        approved.update([variant['configId'], variant['imageId']])
+    if not approved.intersection([candidate['digest'], candidate['config']]):
+        # Identical ordered layer digests prove every stock file is unchanged,
+        # including the executable and all cooked packages used by the overlay.
+        previous = manifest(state['build'])
+        base = (base_image_id(previous) if previous and
+                previous.get('sourceTag', previous['worldTag']) == source['worldTag']
+                else base_image_id(source))
+        def filesystem(image):
+            data = json.loads(run('docker', 'image', 'inspect', image, capture=True))[0]
+            return data['Os'], data['Architecture'], data['RootFS']['Layers'], data['Config']
+        if filesystem(base) != filesystem(candidate['image']):
+            raise ValueError('The incoming world image differs from the reviewed Tank base.')
+    receipt = {'digest': candidate['digest'], 'config': candidate['config'], 'source': source['worldTag']}
+    recipe = compatible_spec(source, tag, receipt)
+    patched = build(tag, candidate['image'], recipe=recipe)
+    paths = ['/home/dune/server/DuneSandbox/Content/Paks/' + name for name in recipe['assets']]
+    hashes = run('docker', 'run', '--rm', '--network=none', '--entrypoint', 'sha256sum',
+                 patched, *paths, capture=True)
+    if [line.split()[0] for line in hashes.splitlines()] != list(recipe['assets'].values()):
+        raise ValueError('Built Tank image failed overlay verification.')
+    save_json(receipt_path(tag), receipt)
+    save({**state, 'preparedUpdate': {'build': tag, 'imageId': patched,
+                                      'digest': candidate['digest'], 'config': candidate['config']}})
+
+
+def finish_update(tag):
+    state = read_state()
+    pending = state.pop('preparedUpdate')
+    if pending['build'] != tag or base_image_id(manifest(tag)) not in (pending['digest'], pending['config']):
+        raise ValueError('Installed game image differs from the verified Tank update.')
+    save({**state, 'build': tag, 'imageId': pending['imageId']})
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['status', 'resolve', 'prepare', 'apply', 'catalog', 'guard', 'update-guard', 'launch-guard'])
+    parser.add_argument('command', choices=['status', 'resolve', 'prepare', 'apply', 'catalog', 'guard', 'update-guard', 'launch-guard', 'update-enabled', 'prepare-update', 'finish-update'])
     parser.add_argument('args', nargs='*')
     a = parser.parse_args()
     tag = os.environ.get('DUNE_WORLD_IMAGE_TAG', '')
-    if a.command == 'status':
+    if a.command == 'update-enabled':
+        state = read_state()
+        if state.get('applying') or state.get('error'):
+            raise ValueError('Resolve the current Tank settings before updating.')
+        print('yes' if state['enabled'] else 'no')
+    elif a.command == 'prepare-update':
+        prepare_update(json.loads(a.args[0]))
+    elif a.command == 'finish-update':
+        finish_update(tag)
+    elif a.command == 'status':
         print(json.dumps(status(tag)))
     elif a.command == 'resolve':
         print(image_for_map(tag, a.args[0]) or '')

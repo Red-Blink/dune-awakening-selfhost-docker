@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -163,6 +163,46 @@ test("scheduled restart leaves the running Battlegroup untouched when saved sett
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /invalid-sietch-config/);
   assert.throws(() => readFileSync(join(generatedDir, "restart-order.log"), "utf8"), /ENOENT/);
+});
+
+test("scheduled restart respects a manual stop and identifies failed lifecycle steps", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "dune-restart-manual-stop-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const scripts = join(dir, "runtime/scripts");
+  const generated = join(dir, "runtime/generated");
+  mkdirSync(join(scripts, "lib"), { recursive: true });
+  mkdirSync(generated, { recursive: true });
+  for (const file of ["restart-schedule.sh", "runtime-env.sh", "memory-swap-common.sh", "env-file.sh",
+    "host-file-ownership.sh", "compose-project.sh", "lib/secrets.sh", "lib/ports.sh", "lib/postgres.sh", "restart-history.sh"]) {
+    copyFileSync(join(repoRoot, "runtime/scripts", file), join(scripts, file));
+  }
+  writeExecutable(join(scripts, "sietches.sh"), "#!/bin/sh\ntouch runtime/generated/preflight-called");
+  writeFileSync(join(scripts, "usersettings.py"), "");
+  writeExecutable(join(scripts, "stop-all.sh"), "#!/bin/sh\nexit \"$STOP_EXIT\"");
+  writeExecutable(join(scripts, "start-all.sh"), "#!/bin/sh\nexit 23");
+  const marker = join(generated, "manual-stop.env");
+  const history = join(generated, "restart-history.jsonl");
+  const run = (stopExit) => spawnSync("bash", ["runtime/scripts/restart-schedule.sh", "run-now"], {
+    cwd: dir, encoding: "utf8", env: { ...process.env, DUNE_HOST_UID: String(process.getuid()),
+      DUNE_HOST_GID: String(process.getgid()), DUNE_SCHEDULED_RESTART_COOLDOWN_SECONDS: "0",
+      SERVER_IP_MODE: "local", STOP_EXIT: String(stopExit) }
+  });
+  for (const contents of ["DUNE_MANUAL_STOP=1\n", `DUNE_MANUAL_STOP_BOOT_ID=${readFileSync("/proc/sys/kernel/random/boot_id", "utf8")}`]) {
+    writeFileSync(marker, contents);
+    const result = run(0);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /manually stopped/);
+    assert.equal(existsSync(join(generated, "preflight-called")), false);
+    assert.equal(existsSync(history), false);
+  }
+  writeFileSync(marker, "DUNE_MANUAL_STOP_BOOT_ID=previous-boot\n");
+  for (const [stopExit, reason] of [[17, "shutdown (exit 17)"], [0, "startup (exit 23)"]]) {
+    const result = run(stopExit);
+    assert.equal(result.status, 1, result.stderr);
+    const row = JSON.parse(readFileSync(history, "utf8").trim().split("\n").at(-1));
+    assert.equal(row.result, "Failed");
+    assert.equal(row.reason, "Scheduled restart failed during " + reason);
+  }
 });
 
 function writeExecutable(path, content) {

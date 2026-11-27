@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { containerStatusLineHas, isHomeStopComplete, preserveTerminalStackResult } from "./ServerPanels";
+import { containerStatusLineHas, isHomeStopComplete, preserveTerminalStackResult, serverSettingsProgressTitle, serverSettingsRestartNotice } from "./ServerPanels";
+
+describe("server settings restart feedback", () => {
+  it("names both maps for network changes and the Director's dependent map for title changes", () => {
+    expect(serverSettingsRestartNotice(true)).toMatch(/Director, Gateway, Survival_1, and Overmap if running/);
+    expect(serverSettingsRestartNotice(false)).toContain("restarts a running Survival_1");
+    expect(serverSettingsRestartNotice(false)).not.toContain("Overmap");
+  });
+
+  it("shows the latest actual restart, including the map restarted by Director", () => {
+    const lines = [{ line: "Updated server mode: public" }];
+    expect(serverSettingsProgressTitle(lines)).toBe("Saving Settings");
+    for (const [service, label] of [["director", "Director"], ["Survival_1", "Survival_1"], ["gateway", "Gateway"], ["Overmap", "Overmap"]]) {
+      lines.push({ line: `Restarting ${service} so the settings take effect...` }, { line: "Waiting..." });
+      expect(serverSettingsProgressTitle(lines)).toBe(`Restarting ${label}`);
+    }
+  });
+});
 
 // Keep the shared parser tolerant of docker ps-style column padding while
 // requiring an exact container-name match.
