@@ -122,6 +122,10 @@ Two overlapping doc sets — start with whichever matches your role:
   - [user-guide.md](integrations/discord-control-bot/user-guide.md) — Historical record. That prototype's command reference.
 - [bot/output-architecture.md](bot/output-architecture.md) — Historical record. Output design notes for the companion repository's Arrakis Control Panel bot.
 
+## Webhook Notifications
+
+- [webhooks/README.md](integrations/webhooks/README.md) — Current, **operator-facing**. Discord or generic HTTPS webhooks for server restarts (manual and automatic) and available game and Console updates: setup, message format, security, API. German: [README_de.md](integrations/webhooks/README_de.md).
+
 ## Security
 
 - [age-secrets.md](security/age-secrets.md) — Current. Optional age encryption at rest for the server-login secrets, and how to migrate to it.
