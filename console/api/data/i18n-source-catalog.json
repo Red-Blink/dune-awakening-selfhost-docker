@@ -119,6 +119,7 @@
     "Add Package",
     "Add Schedule",
     "Add Verified Peer & Sync",
+    "Add Webhook",
     "Add XP",
     "Add an item to this container",
     "Add as",
@@ -435,6 +436,7 @@
     "Buyback schedule saved (disabled).",
     "Buyback sweep log cleared.",
     "Buys complete player-listed stacks when the per-unit ask is within the configured percentage of the selected price basis. A sweep checks eligibility first and, with Safety Backups on, creates a backup only when something qualifies. Seeded pricing follows the reseed augment-pricing choice; category multipliers may be tuned independently.",
+    "By default only Battlegroup restarts are announced.",
     "CHOAM Terminal Installation Failed",
     "CHOAM Terminal Position Reset",
     "CHOAM Terminal Position Reset Failed",
@@ -614,6 +616,7 @@
     "Collapse Select Items",
     "Collapse Server Startup",
     "Collapse Web Console Port",
+    "Collapse Webhooks",
     "Collect new chat messages",
     "Collecting",
     "Collection",
@@ -680,6 +683,7 @@
     "Console Update Failed",
     "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.",
     "Console theme",
+    "Console update available",
     "Console update completed successfully.",
     "Console update failed.",
     "Construction",
@@ -719,6 +723,7 @@
     "Could not load listings. Click again to retry.",
     "Could not load this section.",
     "Could not load translation database status.",
+    "Could not load webhook settings:",
     "Could not refresh API status:",
     "Could not save DeepL API key.",
     "Could not save mesh enrollment secret.",
@@ -941,6 +946,7 @@
     "Discard Unsaved Changes?",
     "Discard and Leave",
     "Discard queued changes",
+    "Discord",
     "Discord Integration",
     "Discord User",
     "Disk",
@@ -1133,6 +1139,7 @@
     "Expand Select Items",
     "Expand Server Startup",
     "Expand Web Console Port",
+    "Expand Webhooks",
     "Expand a row to use the same tools available on the main Bases page.",
     "Expansion",
     "Expected the .tar downloaded from the old server's System Backups, or its .tar.gz.enc archive.",
@@ -1282,6 +1289,7 @@
     "Game Version Mismatch",
     "Game files and images are installed. The database was not touched.",
     "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.",
+    "Game update available",
     "Game updates keep Tanks enabled when the new build is compatible. If compatibility cannot be verified, the update pauses before shutdown. Disabling Tanks restores the original Hagga image and can remove existing Tank vehicles.",
     "Game.ini",
     "Gameplay Toggles",
@@ -1293,6 +1301,7 @@
     "Generator data is unavailable for this base",
     "Generators",
     "Generators & Windtraps",
+    "Generic JSON",
     "Georgian",
     "German",
     "Get Help",
@@ -1426,6 +1435,7 @@
     "In-Game Notice Before (Min)",
     "In-game notice must be between 0 and 60 minutes.",
     "Inactive",
+    "Include map and service restarts",
     "Includes available game history. Self-deaths do not affect PvP K/D. Events removed by the game before collection cannot be recovered.",
     "Incoming character transfer policy",
     "Indonesian",
@@ -1636,6 +1646,7 @@
     "Loading table page...",
     "Loading updated game container images.",
     "Loading water storage…",
+    "Loading webhooks...",
     "Loading...",
     "Loading…",
     "Loadout",
@@ -1931,6 +1942,7 @@
     "No vehicles match this filter.",
     "No vehicles.",
     "No water storage at this base.",
+    "No webhooks configured yet.",
     "Node",
     "None",
     "None yet.",
@@ -2143,6 +2155,7 @@
     "Portuguese",
     "Portuguese (Brazil)",
     "Position",
+    "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available.",
     "Postgres",
     "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.",
     "Postgres version",
@@ -2595,12 +2608,14 @@
     "Save Schedule",
     "Save Settings",
     "Save Token",
+    "Save Webhooks",
     "Save a passphrase below before turning on automatic system backups.",
     "Save a passphrase first",
     "Save as Default",
     "Save changes",
     "Save or discard your changes before leaving Bot Items.",
     "Save or revert roster changes first",
+    "Save your changes first.",
     "Saved",
     "Saved Map Data",
     "Saved Passphrase",
@@ -2726,6 +2741,7 @@
     "Send Now",
     "Send On",
     "Send Server Broadcast",
+    "Send Test",
     "Send recurring announcements using each schedule’s timezone.",
     "Sender",
     "Sending...",
@@ -2751,6 +2767,7 @@
     "Server Title",
     "Server details are still loading.",
     "Server listing issue:",
+    "Server restart",
     "Server status is unavailable.",
     "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
     "Server status unavailable",
@@ -3271,6 +3288,7 @@
     "Update Landsraad Goals",
     "Update Log",
     "Update Timed Out",
+    "Update check interval (minutes)",
     "Update setup values and redeploy your Dune server.",
     "Update the Console after a game update",
     "Update this recurring message.",
@@ -3388,6 +3406,8 @@
     "Weapons",
     "Web Console Port",
     "Web Console Port Saved",
+    "Webhook URL",
+    "Webhooks",
     "Weekly",
     "Weeks",
     "Welcome",
@@ -3971,7 +3991,7 @@
     ", then paste it below.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 282,
+        "line": 284,
         "nearby": [
           "[Your Server Page]",
           "Generated Claim Code",
@@ -4063,7 +4083,7 @@
     ". Open the new address shown in the result message.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 345,
+        "line": 347,
         "nearby": [
           "Change the browser port used by this web console.",
           "After saving, this page will stop responding on port",
@@ -4123,7 +4143,7 @@
     ". Update the environment value to change it.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 364,
+        "line": 366,
         "nearby": [
           "Change the password used to sign in to this web console.",
           "The login password is managed by",
@@ -4349,7 +4369,7 @@
     "[Your Server Page]": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 282,
+        "line": 284,
         "nearby": [
           "Public Listing Profile",
           "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from",
@@ -4358,7 +4378,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 281,
+        "line": 283,
         "nearby": [
           "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from",
           ", then paste it below.",
@@ -5059,7 +5079,7 @@
     "ABCD-EF12-3456": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 289,
+        "line": 291,
         "nearby": [
           ", then paste it below.",
           "Generated Claim Code",
@@ -5083,7 +5103,7 @@
     "About Anonymous Count": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 245,
+        "line": 247,
         "nearby": [
           "Listing Claim Failed",
           "Settings",
@@ -6066,6 +6086,18 @@
         ]
       }
     ],
+    "Add Webhook": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 181,
+        "nearby": [
+          "Remove",
+          "Update check interval (minutes)",
+          "Saving...",
+          "Save Webhooks"
+        ]
+      }
+    ],
     "Add XP": [
       {
         "file": "console/web/src/features/players/SpecializationTab.tsx",
@@ -6305,7 +6337,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 457,
+        "line": 458,
         "nearby": [
           "Chat",
           "Settings"
@@ -6437,7 +6469,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 435,
+        "line": 436,
         "nearby": [
           "Landsraad",
           "Exchange",
@@ -6590,7 +6622,7 @@
     "After saving, this page will stop responding on port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 345,
+        "line": 347,
         "nearby": [
           "Web Console Port",
           "Change the browser port used by this web console.",
@@ -7233,7 +7265,7 @@
     "Anonymous Count:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 253,
+        "line": 255,
         "nearby": [
           "About Anonymous Count",
           "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.",
@@ -7269,7 +7301,7 @@
     "API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 394,
+        "line": 402,
         "nearby": [
           "Collapse API Keys",
           "Expand API Keys",
@@ -7787,7 +7819,7 @@
     "At Least 13 Characters": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 367,
+        "line": 369,
         "nearby": [
           "Current password",
           "New Password",
@@ -7797,7 +7829,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 419,
+        "line": 427,
         "nearby": [
           "Expand API Keys",
           "API Keys",
@@ -8477,7 +8509,7 @@
     "Automatic Startup:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 323,
+        "line": 325,
         "nearby": [
           "Start Battlegroup Automatically",
           "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.",
@@ -9015,7 +9047,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 447,
+        "line": 448,
         "nearby": [
           "Logs",
           "Database",
@@ -9486,7 +9518,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 430,
+        "line": 431,
         "nearby": [
           "Maps",
           "Live Map",
@@ -10724,6 +10756,18 @@
         ]
       }
     ],
+    "By default only Battlegroup restarts are announced.": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 158,
+        "nearby": [
+          "Webhook URL",
+          "Enabled",
+          "Include map and service restarts",
+          "Save your changes first."
+        ]
+      }
+    ],
     "Cancel": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
@@ -11136,7 +11180,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Exchange",
           "Admin Tools",
@@ -11440,7 +11484,7 @@
     "Change Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 377,
+        "line": 379,
         "nearby": [
           "Password requirements",
           "Saving...",
@@ -11472,7 +11516,7 @@
     "Change the browser port used by this web console.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 344,
+        "line": 346,
         "nearby": [
           "Expand Web Console Port",
           "Web Console Port",
@@ -11496,7 +11540,7 @@
     "Change the password used to sign in to this web console.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 363,
+        "line": 365,
         "nearby": [
           "Expand Login Password",
           "Login Password",
@@ -11556,7 +11600,7 @@
     "Changing Login Password...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 126,
+        "line": 128,
         "nearby": [
           "Password Change Failed",
           "New password and confirmation do not match.",
@@ -11816,7 +11860,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 449,
+        "line": 450,
         "nearby": [
           "Backups",
           "Updates",
@@ -13439,10 +13483,10 @@
     "Collapse API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 394,
+        "line": 402,
         "nearby": [
-          "Expand Encrypted API Access",
-          "Encrypted API Access",
+          "Expand Webhooks",
+          "Webhooks",
           "Expand API Keys",
           "API Keys"
         ]
@@ -13511,7 +13555,7 @@
     "Collapse Encrypted API Access": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 388,
+        "line": 390,
         "nearby": [
           "Saving...",
           "Change Password",
@@ -13547,7 +13591,7 @@
     "Collapse Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 361,
+        "line": 363,
         "nearby": [
           "Saving...",
           "Save And Restart Console",
@@ -13571,7 +13615,7 @@
     "Collapse Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 275,
+        "line": 277,
         "nearby": [
           "Refresh",
           "Server listing issue:",
@@ -13607,7 +13651,7 @@
     "Collapse Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 307,
+        "line": 309,
         "nearby": [
           "Verifying...",
           "Verify Generated Code",
@@ -13619,12 +13663,24 @@
     "Collapse Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 342,
+        "line": 344,
         "nearby": [
           "Enabled",
           "Disabled",
           "Expand Web Console Port",
           "Web Console Port"
+        ]
+      }
+    ],
+    "Collapse Webhooks": [
+      {
+        "file": "console/web/src/features/settings/SettingsPanel.tsx",
+        "line": 396,
+        "nearby": [
+          "Expand Encrypted API Access",
+          "Encrypted API Access",
+          "Expand Webhooks",
+          "Webhooks"
         ]
       }
     ],
@@ -14156,7 +14212,7 @@
     "Confirm new password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 368,
+        "line": 370,
         "nearby": [
           "Matches",
           "Passwords do not match",
@@ -14168,7 +14224,7 @@
     "Confirm New Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 368,
+        "line": 370,
         "nearby": [
           "New Password",
           "At Least 13 Characters",
@@ -14395,7 +14451,7 @@
     "Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 347,
+        "line": 349,
         "nearby": [
           "After saving, this page will stop responding on port",
           ". Open the new address shown in the result message.",
@@ -14450,6 +14506,18 @@
           "Restarting Web Console",
           "Updating Console",
           "Downloading the selected console release."
+        ]
+      }
+    ],
+    "Console update available": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 11,
+        "nearby": [
+          "Server restart",
+          "Game update available",
+          "Could not load webhook settings:",
+          "Loading webhooks..."
         ]
       }
     ],
@@ -15142,6 +15210,18 @@
         ]
       }
     ],
+    "Could not load webhook settings:": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 123,
+        "nearby": [
+          "Game update available",
+          "Console update available",
+          "Loading webhooks...",
+          "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available."
+        ]
+      }
+    ],
     "Could not refresh API status:": [
       {
         "file": "console/web/src/features/settings/EncryptedApiSection.tsx",
@@ -15623,7 +15703,7 @@
     "Current password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 366,
+        "line": 368,
         "nearby": [
           ". Update the environment value to change it.",
           "Current Password",
@@ -15635,7 +15715,7 @@
     "Current Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 366,
+        "line": 368,
         "nearby": [
           "The login password is managed by",
           ". Update the environment value to change it.",
@@ -16072,7 +16152,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 446,
+        "line": 447,
         "nearby": [
           "Server Control",
           "Logs",
@@ -18404,6 +18484,18 @@
         ]
       }
     ],
+    "Discord": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 141,
+        "nearby": [
+          "Name",
+          "Type",
+          "Generic JSON",
+          "Webhook URL"
+        ]
+      }
+    ],
     "Discord User": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
@@ -20166,12 +20258,12 @@
     "Encrypted API Access": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 388,
+        "line": 390,
         "nearby": [
           "Collapse Encrypted API Access",
           "Expand Encrypted API Access",
-          "Collapse API Keys",
-          "Expand API Keys"
+          "Collapse Webhooks",
+          "Expand Webhooks"
         ]
       }
     ],
@@ -20235,7 +20327,7 @@
     "Enter a port number between 1 and 65535.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 143,
+        "line": 145,
         "nearby": [
           "Password Change Failed",
           "Port Change Failed",
@@ -20362,7 +20454,7 @@
     "Enter your current login password.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 114,
+        "line": 116,
         "nearby": [
           "Password Change Failed",
           "New password must meet all password requirements."
@@ -20605,7 +20697,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 434,
+        "line": 435,
         "nearby": [
           "Guilds",
           "Landsraad",
@@ -20836,9 +20928,9 @@
     "Expand API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 394,
+        "line": 402,
         "nearby": [
-          "Encrypted API Access",
+          "Webhooks",
           "Collapse API Keys",
           "API Keys",
           "At Least 13 Characters"
@@ -20908,12 +21000,12 @@
     "Expand Encrypted API Access": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 388,
+        "line": 390,
         "nearby": [
           "Change Password",
           "Collapse Encrypted API Access",
           "Encrypted API Access",
-          "Collapse API Keys"
+          "Collapse Webhooks"
         ]
       }
     ],
@@ -20944,7 +21036,7 @@
     "Expand Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 361,
+        "line": 363,
         "nearby": [
           "Save And Restart Console",
           "Collapse Login Password",
@@ -20968,7 +21060,7 @@
     "Expand Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 275,
+        "line": 277,
         "nearby": [
           "Server listing issue:",
           "Collapse Public Listing Profile",
@@ -21004,7 +21096,7 @@
     "Expand Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 307,
+        "line": 309,
         "nearby": [
           "Verify Generated Code",
           "Collapse Server Startup",
@@ -21016,12 +21108,24 @@
     "Expand Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 342,
+        "line": 344,
         "nearby": [
           "Disabled",
           "Collapse Web Console Port",
           "Web Console Port",
           "Change the browser port used by this web console."
+        ]
+      }
+    ],
+    "Expand Webhooks": [
+      {
+        "file": "console/web/src/features/settings/SettingsPanel.tsx",
+        "line": 396,
+        "nearby": [
+          "Encrypted API Access",
+          "Collapse Webhooks",
+          "Webhooks",
+          "Collapse API Keys"
         ]
       }
     ],
@@ -21491,7 +21595,7 @@
     "Files Checklist": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 445,
+        "line": 453,
         "nearby": [
           "Special Character",
           "Runtime Configuration",
@@ -22652,7 +22756,7 @@
     "Found": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 446,
+        "line": 454,
         "nearby": [
           "Runtime Configuration",
           "Files Checklist",
@@ -23118,6 +23222,17 @@
         ]
       }
     ],
+    "Game update available": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 10,
+        "nearby": [
+          "Server restart",
+          "Console update available",
+          "Could not load webhook settings:"
+        ]
+      }
+    ],
     "Game Update Paused": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
@@ -23318,7 +23433,7 @@
     "Generated Claim Code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 284,
+        "line": 286,
         "nearby": [
           "[Your Server Page]",
           ", then paste it below.",
@@ -23394,6 +23509,18 @@
           "Loading…",
           "Water",
           "A shorter interval pulls the next scan in. A longer one applies after the next scan. A changed threshold is used by the next scan, not immediately."
+        ]
+      }
+    ],
+    "Generic JSON": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 142,
+        "nearby": [
+          "Type",
+          "Discord",
+          "Webhook URL",
+          "Enabled"
         ]
       }
     ],
@@ -24381,7 +24508,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 432,
+        "line": 433,
         "nearby": [
           "Bases",
           "Vehicles",
@@ -24508,7 +24635,7 @@
     "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 245,
+        "line": 247,
         "nearby": [
           "Settings",
           "About Anonymous Count",
@@ -24617,7 +24744,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 443,
+        "line": 444,
         "nearby": [
           "Admin Tools",
           "Care Package",
@@ -25521,6 +25648,18 @@
           "Active",
           "Automatic System Backups",
           "Save a passphrase first"
+        ]
+      }
+    ],
+    "Include map and service restarts": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 160,
+        "nearby": [
+          "Enabled",
+          "By default only Battlegroup restarts are announced.",
+          "Save your changes first.",
+          "Send Test"
         ]
       }
     ],
@@ -27053,7 +27192,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Vehicles",
           "Guilds",
@@ -27714,7 +27853,7 @@
     "Listing Claim Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 226,
+        "line": 228,
         "nearby": [
           "Verifying Listing Claim...",
           "Public Listing Claimed",
@@ -27758,7 +27897,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 429,
+        "line": 430,
         "nearby": [
           "Players",
           "Maps",
@@ -28938,6 +29077,18 @@
         ]
       }
     ],
+    "Loading webhooks...": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 124,
+        "nearby": [
+          "Console update available",
+          "Could not load webhook settings:",
+          "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available.",
+          "No webhooks configured yet."
+        ]
+      }
+    ],
     "Loading...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
@@ -29247,7 +29398,7 @@
     "Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 361,
+        "line": 363,
         "nearby": [
           "Collapse Login Password",
           "Expand Login Password",
@@ -29259,7 +29410,7 @@
     "Login Password Changed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 132,
+        "line": 134,
         "nearby": [
           "New password and confirmation do not match.",
           "Changing Login Password...",
@@ -29313,7 +29464,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Home",
           "Server Control",
@@ -29353,7 +29504,7 @@
     "Lowercase Letter": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 420,
+        "line": 428,
         "nearby": [
           "API Keys",
           "At Least 13 Characters",
@@ -29836,7 +29987,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 428,
+        "line": 429,
         "nearby": [
           "Addons",
           "Players",
@@ -30013,7 +30164,7 @@
     "Matches": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 368,
+        "line": 370,
         "nearby": [
           "At Least 13 Characters",
           "Confirm New Password",
@@ -30602,7 +30753,7 @@
     "Missing": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 446,
+        "line": 454,
         "nearby": [
           "Files Checklist",
           "Found",
@@ -30938,6 +31089,16 @@
           "Name the key, choose its limits, then select its permissions.",
           "e.g. Map Viewer",
           "The tool or service that will use this key."
+        ]
+      },
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 136,
+        "nearby": [
+          "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available.",
+          "No webhooks configured yet.",
+          "Type",
+          "Discord"
         ]
       }
     ],
@@ -31351,7 +31512,7 @@
     "New Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 367,
+        "line": 369,
         "nearby": [
           "Current Password",
           "Current password",
@@ -31373,7 +31534,7 @@
     "New password and confirmation do not match.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 122,
+        "line": 124,
         "nearby": [
           "New password must meet all password requirements.",
           "Password Change Failed",
@@ -31385,7 +31546,7 @@
     "New password must meet all password requirements.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 118,
+        "line": 120,
         "nearby": [
           "Enter your current login password.",
           "Password Change Failed",
@@ -33000,6 +33161,18 @@
         ]
       }
     ],
+    "No webhooks configured yet.": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 132,
+        "nearby": [
+          "Loading webhooks...",
+          "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available.",
+          "Name",
+          "Type"
+        ]
+      }
+    ],
     "nobody can ever decrypt": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
@@ -33492,7 +33665,7 @@
     "Number": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 422,
+        "line": 430,
         "nearby": [
           "Lowercase Letter",
           "Uppercase Letter",
@@ -35411,14 +35584,14 @@
     "Password Change Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 114,
+        "line": 116,
         "nearby": [
           "Enter your current login password."
         ]
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 118,
+        "line": 120,
         "nearby": [
           "Enter your current login password.",
           "New password must meet all password requirements."
@@ -35426,7 +35599,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 122,
+        "line": 124,
         "nearby": [
           "New password must meet all password requirements.",
           "New password and confirmation do not match.",
@@ -35435,7 +35608,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 135,
+        "line": 137,
         "nearby": [
           "Login Password Changed",
           "Signing you out so you can log back in with the new password.",
@@ -35500,7 +35673,7 @@
     "Password requirements": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 372,
+        "line": 374,
         "nearby": [
           "Confirm new password",
           "Password Requirements",
@@ -35512,7 +35685,7 @@
     "Password Requirements": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 371,
+        "line": 373,
         "nearby": [
           "Passwords do not match",
           "Confirm new password",
@@ -35536,7 +35709,7 @@
     "Passwords do not match": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 368,
+        "line": 370,
         "nearby": [
           "Confirm New Password",
           "Matches",
@@ -36496,7 +36669,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 427,
+        "line": 428,
         "nearby": [
           "Care Package",
           "Addons",
@@ -36654,7 +36827,7 @@
     "Port Change Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 143,
+        "line": 145,
         "nearby": [
           "Signing you out so you can log back in with the new password.",
           "Password Change Failed",
@@ -36664,7 +36837,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 163,
+        "line": 165,
         "nearby": [
           "Saving Web Console Port...",
           "Web Console Port Saved",
@@ -36759,6 +36932,18 @@
         "line": 138,
         "nearby": [
           "negative"
+        ]
+      }
+    ],
+    "Post a message to Discord or any HTTPS endpoint when the server restarts (manually or automatically) or when a game or Console update is available.": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 129,
+        "nearby": [
+          "Could not load webhook settings:",
+          "Loading webhooks...",
+          "No webhooks configured yet.",
+          "Name"
         ]
       }
     ],
@@ -37532,7 +37717,7 @@
     "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 280,
+        "line": 282,
         "nearby": [
           "Expand Public Listing Profile",
           "Public Listing Profile",
@@ -37586,7 +37771,7 @@
     "Public Listing Claimed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 219,
+        "line": 221,
         "nearby": [
           "Server Startup Save Failed",
           "Verifying Listing Claim...",
@@ -37598,7 +37783,7 @@
     "Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 277,
+        "line": 279,
         "nearby": [
           "Collapse Public Listing Profile",
           "Expand Public Listing Profile",
@@ -40021,6 +40206,16 @@
           "Augments:",
           "Delete Stack",
           "Enter an amount between 1 and"
+        ]
+      },
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 168,
+        "nearby": [
+          "Save your changes first.",
+          "Send Test",
+          "Update check interval (minutes)",
+          "Add Webhook"
         ]
       },
       {
@@ -43386,7 +43581,7 @@
     "Runtime Configuration": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 432,
+        "line": 440,
         "nearby": [
           "Number",
           "Special Character",
@@ -43398,7 +43593,7 @@
     "Runtime file checks have not loaded yet.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 447,
+        "line": 455,
         "nearby": [
           "Found",
           "Missing",
@@ -43790,7 +43985,7 @@
     "Save And Restart Console": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 350,
+        "line": 352,
         "nearby": [
           "Console Port",
           "Saving...",
@@ -44204,6 +44399,28 @@
         ]
       }
     ],
+    "Save Webhooks": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 182,
+        "nearby": [
+          "Add Webhook",
+          "Saving..."
+        ]
+      }
+    ],
+    "Save your changes first.": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 165,
+        "nearby": [
+          "By default only Battlegroup restarts are announced.",
+          "Include map and service restarts",
+          "Send Test",
+          "Remove"
+        ]
+      }
+    ],
     "Saved": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
@@ -44283,7 +44500,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 254,
+        "line": 256,
         "nearby": [
           "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.",
           "Anonymous Count:",
@@ -44293,7 +44510,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 265,
+        "line": 267,
         "nearby": [
           "Disabled",
           "Server Listing:",
@@ -44302,7 +44519,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 324,
+        "line": 326,
         "nearby": [
           "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.",
           "Automatic Startup:",
@@ -44517,7 +44734,7 @@
     "Saving Server Startup...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 194,
+        "line": 196,
         "nearby": [
           "Web Console Port Saved",
           "Port Change Failed",
@@ -44585,7 +44802,7 @@
     "Saving Web Console Port...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 149,
+        "line": 151,
         "nearby": [
           "Port Change Failed",
           "Enter a port number between 1 and 65535.",
@@ -44662,7 +44879,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 350,
+        "line": 352,
         "nearby": [
           ". Open the new address shown in the result message.",
           "Console Port",
@@ -44672,7 +44889,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 377,
+        "line": 379,
         "nearby": [
           "Password Requirements",
           "Password requirements",
@@ -44688,6 +44905,15 @@
           "OFF",
           "Save Schedule",
           "Cancel"
+        ]
+      },
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 182,
+        "nearby": [
+          "Update check interval (minutes)",
+          "Add Webhook",
+          "Save Webhooks"
         ]
       },
       {
@@ -46186,6 +46412,18 @@
         ]
       }
     ],
+    "Send Test": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 166,
+        "nearby": [
+          "Include map and service restarts",
+          "Save your changes first.",
+          "Remove",
+          "Update check interval (minutes)"
+        ]
+      }
+    ],
     "Sender": [
       {
         "file": "console/web/src/features/chat/ChatPanel.tsx",
@@ -46264,7 +46502,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 444,
+        "line": 445,
         "nearby": [
           "Care Package",
           "Home",
@@ -46419,7 +46657,7 @@
     "Server listing issue:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 271,
+        "line": 273,
         "nearby": [
           "Disabled",
           "Refresh",
@@ -46431,7 +46669,7 @@
     "Server Listing:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 264,
+        "line": 266,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -46463,10 +46701,20 @@
         ]
       }
     ],
+    "Server restart": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 9,
+        "nearby": [
+          "Game update available",
+          "Console update available"
+        ]
+      }
+    ],
     "Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 309,
+        "line": 311,
         "nearby": [
           "Collapse Server Startup",
           "Expand Server Startup",
@@ -46478,7 +46726,7 @@
     "Server Startup Save Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 206,
+        "line": 208,
         "nearby": [
           "The Battlegroup will start automatically after the Linux host boots.",
           "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.",
@@ -46490,7 +46738,7 @@
     "Server Startup Saved": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 200,
+        "line": 202,
         "nearby": [
           "Port Change Failed",
           "Saving Server Startup...",
@@ -46938,7 +47186,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 450,
+        "line": 451,
         "nearby": [
           "Updates",
           "Chat",
@@ -46977,7 +47225,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 243,
+        "line": 245,
         "nearby": [
           "Public Listing Claimed",
           "Listing Claim Failed",
@@ -47756,7 +48004,7 @@
     "Signing you out so you can log back in with the new password.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 132,
+        "line": 134,
         "nearby": [
           "Changing Login Password...",
           "Login Password Changed",
@@ -48244,7 +48492,7 @@
     "Special Character": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 423,
+        "line": 431,
         "nearby": [
           "Uppercase Letter",
           "Number",
@@ -48472,7 +48720,7 @@
     "Start Battlegroup Automatically": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 313,
+        "line": 315,
         "nearby": [
           "Expand Server Startup",
           "Server Startup",
@@ -50590,7 +50838,7 @@
     "The Battlegroup will start automatically after the Linux host boots.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 202,
+        "line": 204,
         "nearby": [
           "Saving Server Startup...",
           "Server Startup Saved",
@@ -50626,7 +50874,7 @@
     "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 314,
+        "line": 316,
         "nearby": [
           "Server Startup",
           "Start Battlegroup Automatically",
@@ -50708,7 +50956,7 @@
     "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 203,
+        "line": 205,
         "nearby": [
           "Server Startup Saved",
           "The Battlegroup will start automatically after the Linux host boots.",
@@ -50979,7 +51227,7 @@
     "The login password is managed by": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 364,
+        "line": 366,
         "nearby": [
           "Login Password",
           "Change the password used to sign in to this web console.",
@@ -53038,6 +53286,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 139,
+        "nearby": [
+          "No webhooks configured yet.",
+          "Name",
+          "Discord",
+          "Generic JSON"
+        ]
+      },
+      {
         "file": "console/web/src/features/database/DatabaseSchemaBrowser.tsx",
         "line": 165,
         "nearby": [
@@ -54057,6 +54315,18 @@
         ]
       }
     ],
+    "Update check interval (minutes)": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 174,
+        "nearby": [
+          "Send Test",
+          "Remove",
+          "Add Webhook",
+          "Saving..."
+        ]
+      }
+    ],
     "Update Complete": [
       {
         "file": "console/web/src/features/updates/UpdatesPanel.tsx",
@@ -54249,7 +54519,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 448,
+        "line": 449,
         "nearby": [
           "Database",
           "Backups",
@@ -54448,7 +54718,7 @@
     "Uppercase Letter": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 421,
+        "line": 429,
         "nearby": [
           "At Least 13 Characters",
           "Lowercase Letter",
@@ -54947,7 +55217,7 @@
       },
       {
         "file": "console/web/src/skins/skinDefaults.ts",
-        "line": 431,
+        "line": 432,
         "nearby": [
           "Live Map",
           "Bases",
@@ -55061,7 +55331,7 @@
     "Verify Generated Code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 295,
+        "line": 297,
         "nearby": [
           "ABCD-EF12-3456",
           "Verifying...",
@@ -55097,7 +55367,7 @@
     "Verifying Listing Claim...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 213,
+        "line": 215,
         "nearby": [
           "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.",
           "Server Startup Save Failed",
@@ -55155,7 +55425,7 @@
     "Verifying...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 295,
+        "line": 297,
         "nearby": [
           "Generated Claim Code",
           "ABCD-EF12-3456",
@@ -55765,7 +56035,7 @@
     "Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 342,
+        "line": 344,
         "nearby": [
           "Collapse Web Console Port",
           "Expand Web Console Port",
@@ -55777,12 +56047,36 @@
     "Web Console Port Saved": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 157,
+        "line": 159,
         "nearby": [
           "Enter a port number between 1 and 65535.",
           "Saving Web Console Port...",
           "Port Change Failed",
           "Saving Server Startup..."
+        ]
+      }
+    ],
+    "Webhook URL": [
+      {
+        "file": "console/web/src/features/settings/WebhooksSection.tsx",
+        "line": 145,
+        "nearby": [
+          "Discord",
+          "Generic JSON",
+          "Enabled",
+          "By default only Battlegroup restarts are announced."
+        ]
+      }
+    ],
+    "Webhooks": [
+      {
+        "file": "console/web/src/features/settings/SettingsPanel.tsx",
+        "line": 396,
+        "nearby": [
+          "Collapse Webhooks",
+          "Expand Webhooks",
+          "Collapse API Keys",
+          "Expand API Keys"
         ]
       }
     ],

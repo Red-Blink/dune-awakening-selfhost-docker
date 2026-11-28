@@ -7,6 +7,7 @@ import { firstDefined, formatUiSentence, friendlyColumnName } from "../../lib/di
 import { ApiKeysSection } from "./ApiKeysSection";
 import { ExperimentalFeatures } from "./ExperimentalFeatures";
 import { EncryptedApiSection } from "./EncryptedApiSection";
+import { WebhooksSection } from "./WebhooksSection";
 import { ConsoleAccessNotice, type ConsoleAccessStatus } from "./ConsoleAccessNotice";
 import { LayoutWidget, LayoutZone } from "../../skins/LayoutZone";
 
@@ -62,6 +63,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
   const [webPortRedirectCountdown, setWebPortRedirectCountdown] = useState<number | null>(null);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [encryptedApiOpen, setEncryptedApiOpen] = useState(false);
+  const [webhooksOpen, setWebhooksOpen] = useState(false);
   const [serverStartupOpen, setServerStartupOpen] = useState(false);
   const [serverStartupSaving, setServerStartupSaving] = useState(false);
   const [serverStartupResult, setServerStartupResult] = useState<SettingsTaskResult | null>(null);
@@ -387,6 +389,12 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
         <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
           {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
+        </div>
+      </LayoutWidget>
+      <LayoutWidget id="settings.webhooks" widgetTitle="Webhooks">
+        <div className={`playerAdmin_toggle settings-webhooks-toggle ${webhooksOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={webhooksOpen ? "Collapse Webhooks" : "Expand Webhooks"} onClick={() => setWebhooksOpen(!webhooksOpen)}>{webhooksOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Webhooks</span></button>
+          {webhooksOpen && <div className="playerAdmin_toggleBody"><WebhooksSection /></div>}
         </div>
       </LayoutWidget>
       <LayoutWidget id="settings.apiKeys" widgetTitle="API Keys">
