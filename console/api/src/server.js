@@ -111,6 +111,7 @@ import { banPlayer, bannedFlsIds, createPlayerBanEnforcer, playerBanFor, unbanPl
 import { findPlayerForLiveAction, playerIsOnlineForLiveAction } from "./playerLiveActions.js";
 import { retireLegacyEdaExchangeBot } from "./services/marketBotRetirement.js";
 import { readSelfUpdateStatus } from "./services/selfUpdateStatus.js";
+import { createWebhookNotifier } from "./services/webhookNotifier.js";
 import { createScheduledMapMessageScheduler } from "./services/scheduledMapMessages.js";
 import { createQaUpdates } from "./services/qaUpdates.js";
 import { SETUP_CONFIG_KEYS, validHostDatacenterId } from "./services/setupConfig.js";
@@ -258,6 +259,16 @@ const tasks = new TaskManager(config, {
     flushVehicleDeletes: () => flushQueuedVehicleDeletes({ forceFresh: true, allowBlockedStates: true, ignoreRetryBackoff: true, trustedDownPartitionIds, onBeforeApply: ensureDeleteBackup })
     });
   }
+});
+
+// Restarts are followed in the restart journal; update checks share the
+// Updates page's caches (see TaskManager.readGameUpdateCheck).
+const webhookNotifier = createWebhookNotifier({
+  repoRoot: config.repoRoot,
+  restartHistoryFile: config.restartHistoryFile,
+  version: config.version,
+  readGameUpdate: () => tasks.readGameUpdateCheck(),
+  readConsoleUpdate: () => tasks.readConsoleUpdateCheck()
 });
 installAuditShutdownHooks();
 let db = createDb(config);
@@ -422,6 +433,10 @@ setInterval(() => {
   runBackgroundTick("Bases water auto-refill", () => autoRefillWaterScheduler.tick());
   runBackgroundTick("Restart queue", restartQueueAutoTick);
 }, 10000).unref?.();
+
+setInterval(() => {
+  runBackgroundTick("Webhook notifications", () => webhookNotifier.tick());
+}, 15_000).unref?.();
 
 setInterval(() => {
   if (!memoryBalancer.publicState().enabled) return;
@@ -1521,6 +1536,9 @@ async function handleApi(req, res) {
   if (path === "/api/settings/public-directory" && req.method === "POST") return publicDirectorySettingsRoute(req, res);
   if (path === "/api/settings/public-directory/claim" && req.method === "POST") return publicDirectoryClaimRoute(req, res);
   if (path === "/api/settings/server-startup" && req.method === "POST") return serverStartupSettingsRoute(req, res);
+  if (path === "/api/settings/webhooks" && req.method === "GET") return json(res, 200, webhookNotifier.view());
+  if (path === "/api/settings/webhooks" && req.method === "POST") return webhookSettingsRoute(req, res);
+  if (path === "/api/settings/webhooks/test" && req.method === "POST") return webhookTestRoute(req, res);
   if (path === "/api/settings/experimental-tanks" && req.method === "GET") {
     const result = await runDune(config, buildDuneArgs("experimentalTanksStatus"));
     if (result.code !== 0) return json(res, 503, { error: result.stderr || "Experimental Tank settings could not be read." });
@@ -3126,6 +3144,37 @@ function realtimeStreamRoute(req, res) {
     allowPlayers: () => may("players:read"),
     stillAllowed: () => may("realtime:read")
   });
+}
+
+async function webhookSettingsRoute(req, res) {
+  try {
+    const result = webhookNotifier.save(await readJson(req));
+    audit(config, req, "settings.webhooks-updated", {
+      count: result.webhooks.length,
+      webhooks: result.webhooks.map((hook) => ({ id: hook.id, name: hook.name, type: hook.type, enabled: hook.enabled, events: hook.events }))
+    });
+    return json(res, 200, result);
+  } catch (error) {
+    return json(res, webhookErrorStatus(error), { error: redact(error?.message || "Webhook settings could not be saved.") });
+  }
+}
+
+// readJson throws a bare SyntaxError for a malformed body: that is the
+// client's mistake (400), not a server fault.
+function webhookErrorStatus(error) {
+  return error instanceof SyntaxError ? 400 : error?.statusCode || 500;
+}
+
+async function webhookTestRoute(req, res) {
+  if (!applyMutationRateLimit(req, res, "settings.webhook-test")) return;
+  try {
+    const body = await readJson(req);
+    const result = await webhookNotifier.sendTest(String(body?.id || ""));
+    audit(config, req, "settings.webhook-test", { id: String(body?.id || ""), ok: result.ok, status: result.status });
+    return json(res, 200, result);
+  } catch (error) {
+    return json(res, webhookErrorStatus(error), { error: redact(error?.message || "Test message could not be sent.") });
+  }
 }
 
 async function realtimeAgentRoute(res, action) {

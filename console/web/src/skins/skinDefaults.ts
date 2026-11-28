@@ -121,6 +121,7 @@ export const DEFAULT_PAGE_WIDGET_LAYOUTS: Record<string, PageWidgetLayoutConfig>
       { id: "settings.webPort", title: String("Web Console Port"), span: 6, hidden: false },
       { id: "settings.password", title: String("Login Password"), span: 6, hidden: false },
       { id: "settings.encryptedApi", title: String("Encrypted API Access"), span: 6, hidden: false },
+      { id: "settings.webhooks", title: String("Webhooks"), span: 6, hidden: false },
       { id: "settings.apiKeys", title: String("API Keys"), span: 6, hidden: false },
     ],
   },

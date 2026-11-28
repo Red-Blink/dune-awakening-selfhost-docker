@@ -9218,6 +9218,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .skin-embedded-single-settings-webPort .skin-widget-slot:not([data-widget-id="settings.webPort"]),
 .skin-embedded-single-settings-password .skin-widget-slot:not([data-widget-id="settings.password"]),
 .skin-embedded-single-settings-encryptedApi .skin-widget-slot:not([data-widget-id="settings.encryptedApi"]),
+.skin-embedded-single-settings-webhooks .skin-widget-slot:not([data-widget-id="settings.webhooks"]),
 .skin-embedded-single-settings-apiKeys .skin-widget-slot:not([data-widget-id="settings.apiKeys"]),
 .skin-embedded-single-admin-liveTools .skin-widget-slot:not([data-widget-id="admin.liveTools"]),
 .skin-embedded-single-admin-schedule .skin-widget-slot:not([data-widget-id="admin.schedule"]),
@@ -9264,3 +9265,14 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   text-transform: uppercase;
   opacity: .85;
 }
+
+/* Settings → Webhooks (features/settings/WebhooksSection.tsx) */
+.webhooks-section { display: grid; gap: 16px; min-width: 0; }
+.webhooks-section p { margin: 0; line-height: 1.5; }
+.webhook-card { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--border, rgba(127, 127, 127, 0.3)); border-radius: 8px; }
+.webhook-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.webhook-fields label { display: grid; gap: 6px; min-width: 0; }
+.webhook-fields .webhook-url { grid-column: 1 / -1; }
+.webhook-options { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.webhook-check { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.webhook-check input { width: auto; flex: 0 0 auto; margin: 0; }

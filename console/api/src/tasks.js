@@ -66,6 +66,17 @@ export class TaskManager {
     });
   }
 
+  // For background consumers (webhooks). Both share the caches the Updates
+  // page uses: a cached result is reused, and a live Steam/GitHub check runs
+  // only once the cached one has expired.
+  readGameUpdateCheck() {
+    return this.updateCheckCache.read();
+  }
+
+  readConsoleUpdateCheck() {
+    return this.consoleUpdateCheckCache.read();
+  }
+
   list() {
     return [...this.tasks.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }

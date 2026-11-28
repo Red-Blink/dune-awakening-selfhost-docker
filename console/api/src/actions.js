@@ -205,6 +205,11 @@ export const ROUTE_ACTIONS = {
   "POST /api/settings/public-directory":       "settings:write",
   "POST /api/settings/public-directory/claim": "settings:write",
   "POST /api/settings/server-startup":          "settings:write",
+  // Outgoing webhooks (services/webhookNotifier.js). Stored URLs are secrets
+  // and never returned; test sends one sample message to a saved webhook.
+  "GET /api/settings/webhooks":                "settings:read",
+  "POST /api/settings/webhooks":               "settings:write",
+  "POST /api/settings/webhooks/test":          "settings:write",
   "GET /api/settings/experimental-tanks":      "settings:read",
   "POST /api/settings/experimental-tanks":     "settings:write",
   "POST /api/i18n/translate":                  "settings:write",

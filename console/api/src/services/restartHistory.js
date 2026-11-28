@@ -59,6 +59,33 @@ export function readRestartHistory(config, { limit = 100 } = {}) {
   };
 }
 
+function restartRowKey(row) {
+  return `${row.id}|${row.finishedAt}`;
+}
+
+// Incremental reader for consumers that follow the journal (webhooks). The
+// shell scripts append from outside this process, so following the file is
+// the one mechanism that sees every restart. The cursor holds the last row's
+// key plus the file's size and mtime: an unchanged file is not re-read, and a
+// trim (appendRestartHistory rewrites the newest MAX_ROWS in place) is handled
+// by locating the last key rather than a byte offset. A first call returns no
+// rows, so a new consumer never replays history.
+export function readRestartRowsSince(file, cursor = {}, { maxRows = 20 } = {}) {
+  let size = 0;
+  let mtimeMs = 0;
+  try { ({ size, mtimeMs } = statSync(file)); } catch {}
+  if (typeof cursor.lastKey === "string" && cursor.size === size && cursor.mtimeMs === mtimeMs) return { rows: [], cursor };
+  const all = readRows(file);
+  const next = { lastKey: all.length ? restartRowKey(all[all.length - 1]) : "", size, mtimeMs };
+  if (typeof cursor.lastKey !== "string") return { rows: [], cursor: next };
+  let rows = all;
+  if (cursor.lastKey) {
+    const index = all.findLastIndex((row) => restartRowKey(row) === cursor.lastKey);
+    rows = index >= 0 ? all.slice(index + 1) : [];
+  }
+  return { rows: rows.slice(-maxRows), cursor: next };
+}
+
 function readRows(file) {
   if (!existsSync(file)) return [];
   return readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean).flatMap((line) => {
