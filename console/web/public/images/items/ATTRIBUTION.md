@@ -12,6 +12,8 @@ piece icons, and customization icons. Dune: Awakening artwork belongs to its
 respective rights holders, including Funcom. Some icons were padded with transparent
 pixels to fit thumbnail frames. Variant matching used the community wiki's
 [Cosmetics catalog](https://awakening.wiki/Cosmetics).
+The 371 icons added for game update 1.6.0 were extracted the same way by drkshrk
+from the 1.6.0 public test client.
 See the repository [NOTICE](../../../../../NOTICE) for the project disclaimer.
 
 ## Generated Swatch Tiles

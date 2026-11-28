@@ -971,7 +971,7 @@ function validateCarePackageItem(item = {}) {
   const itemId = String(item.itemId || "").trim();
   if (!itemName && !itemId) throw new Error("Care Package item requires itemName or itemId");
   if (itemName && (itemName.length > 240 || /[\r\n]/.test(itemName))) throw new Error("Invalid Care Package item name");
-  if (itemId && !/^[A-Za-z0-9_./:-]{1,240}$/.test(itemId)) throw new Error("Invalid Care Package item id");
+  if (itemId && !/^[A-Za-z0-9_./:&-]{1,240}$/.test(itemId)) throw new Error("Invalid Care Package item id");
   const normalized = {
     itemName,
     itemId,

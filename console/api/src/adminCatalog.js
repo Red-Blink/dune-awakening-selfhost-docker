@@ -283,7 +283,7 @@ export function itemIsRankedSchematic(item = {}, grade = 0) {
 
 function normalizeItem(item, repoRoot = "") {
   const id = String(item.id || "").trim();
-  if (!/^[A-Za-z0-9_./:-]{1,240}$/.test(id)) throw new Error("Invalid resolved item id");
+  if (!/^[A-Za-z0-9_./:&-]{1,240}$/.test(id)) throw new Error("Invalid resolved item id");
   const image = itemImagePath(repoRoot, id);
   const result = {
     id,
